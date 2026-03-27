@@ -1,129 +1,52 @@
-"""
-claude_client.py
-----------------
-Uses a local Ollama model to recommend stretches based on detected
-posture and the user's self-reported pain description.
+# StretchAI
 
-Exports:
-  recommend_stretches(posture_label, pain_text) -> list[dict]
-"""
+StretchAI is a webcam-assisted posture and stretch coach built with Flask, MediaPipe, and OpenCV.
 
-import json
-import logging
-import urllib.request
-import urllib.error
+## Features
 
-from library import STRETCH_LIBRARY, fallback_stretches
+- Live posture detection with annotated webcam feed.
+- Stretch recommendations based on posture + pain text.
+- Guided 5-stretch routine:
+  - Starts from the recommended list.
+  - Validates current stretch form with rule-based landmark checks.
+  - Counts hold time only when form is correct.
+  - Auto-advances through all five stretches.
+  - Shows completion message at the end.
 
-logger = logging.getLogger(__name__)
+## Setup
 
-OLLAMA_URL  = "http://localhost:11434/api/chat"
-OLLAMA_MODEL = "llama3.2"
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install flask flask-cors mediapipe opencv-python numpy
+```
 
-_STRETCH_SUMMARY = "\n".join(
-    f"- {s['id']}: {s['name']} | targets: {s['target_muscle']} | "
-    f"posture tags: {', '.join(s['posture_tags'])} | "
-    f"pain keywords: {', '.join(s['pain_keywords'])}"
-    for s in STRETCH_LIBRARY
-)
+If you use local Ollama recommendations, ensure Ollama is running and the `llama3.2` model is available.
 
-_SYSTEM_PROMPT = f"""You are StretchAI, a workplace wellness assistant.
-Given a detected posture issue and the user's pain description, select exactly 5 stretches from the library below.
+## Run
 
-Respond with ONLY a valid JSON array of exactly 5 stretch IDs. No explanation, no markdown, just the array.
-Example: ["S01", "S06", "S11", "S16", "S08"]
+```bash
+python app.py
+```
 
-Stretch library:
-{_STRETCH_SUMMARY}
-"""
+Then open `http://127.0.0.1:5000`.
 
+## Routine API
 
-def _normalize_to_five(stretches: list[dict]) -> list[dict]:
-    """Return exactly 5 unique stretches, topping up from fallback if needed."""
-    ordered = []
-    seen = set()
-    for s in stretches:
-        sid = s.get("id")
-        if sid and sid not in seen:
-            ordered.append(s)
-            seen.add(sid)
+- `POST /routine/start`
+  - body: `{ "stretch_ids": ["S01","S06","S11","S16","S08"] }`
+- `POST /routine/stop`
+- `GET /routine/status`
 
-    if len(ordered) < 5:
-        for s in fallback_stretches():
-            sid = s.get("id")
-            if sid and sid not in seen:
-                ordered.append(s)
-                seen.add(sid)
-            if len(ordered) == 5:
-                break
+## Manual verification checklist
 
-    if len(ordered) < 5:
-        for s in STRETCH_LIBRARY:
-            sid = s.get("id")
-            if sid and sid not in seen:
-                ordered.append(s)
-                seen.add(sid)
-            if len(ordered) == 5:
-                break
-
-    return ordered[:5]
-
-
-def recommend_stretches(posture_label: str, pain_text: str) -> list:
-    """
-    Ask the local Ollama model to pick 5 stretches for the given posture and pain.
-
-    Returns a list of stretch dicts from STRETCH_LIBRARY.
-    Falls back to fallback_stretches() on any error.
-    """
-    user_message = (
-        f"Detected posture issue: {posture_label}\n"
-        f"User pain description: {pain_text}\n\n"
-        "Reply with only a JSON array of 5 stretch IDs."
-    )
-
-    payload = json.dumps({
-        "model": OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user",   "content": user_message},
-        ],
-        "stream": False,
-    }).encode()
-
-    try:
-        req = urllib.request.Request(
-            OLLAMA_URL,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            body = json.loads(resp.read().decode())
-
-        raw = body["message"]["content"].strip()
-
-        # Strip markdown fences if the model added them
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-
-        # Extract JSON array even if there's surrounding text
-        start = raw.find("[")
-        end   = raw.rfind("]") + 1
-        if start == -1 or end == 0:
-            raise ValueError(f"No JSON array found in response: {raw!r}")
-        ids = json.loads(raw[start:end])
-
-        lookup = {s["id"]: s for s in STRETCH_LIBRARY}
-        result = [lookup[sid] for sid in ids if sid in lookup]
-
-        if not result:
-            raise ValueError(f"No valid IDs in response: {ids}")
-
-        return _normalize_to_five(result)
-
-    except Exception as exc:
-        logger.error("Ollama recommendation failed: %s", exc)
-        return _normalize_to_five(fallback_stretches())
+1. Open app and confirm webcam feed appears.
+2. Enter pain text and click **Recommend stretches**.
+3. Confirm exactly 5 stretches are rendered.
+4. Click **Start stretch routine**.
+5. For current stretch:
+   - Hold incorrect form -> timer stays paused, feedback asks to adjust.
+   - Move into valid form -> status turns correct and timer increases.
+6. Keep correct form until timer reaches target duration.
+7. Confirm routine auto-advances to the next stretch.
+8. Repeat until all 5 are complete and final completion message appears.
