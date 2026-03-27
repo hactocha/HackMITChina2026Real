@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 
 from flask import Flask, Response, jsonify, request, render_template
 from flask_cors import CORS
@@ -13,6 +15,20 @@ from posture_detector import (
 )
 from library import STRETCH_LIBRARY, fallback_stretches
 from claude_client import recommend_stretches
+
+# Enrich STRETCH_LIBRARY with image URLs from stretches.json
+_json_path = os.path.join(os.path.dirname(__file__), "stretches.json")
+try:
+    with open(_json_path, "r") as _f:
+        _json_data = {s["id"]: s for s in json.load(_f)}
+    for _s in STRETCH_LIBRARY:
+        _entry = _json_data.get(_s["id"], {})
+        if "gif_url" in _entry:
+            _s["gif_url"] = _entry["gif_url"]
+        if "image_url" in _entry:
+            _s["image_url"] = _entry["image_url"]
+except Exception:
+    pass
 
 app = Flask(__name__)
 CORS(app)

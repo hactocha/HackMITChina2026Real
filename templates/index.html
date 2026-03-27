@@ -771,7 +771,7 @@
     const imgEl = document.getElementById('stretch-image');
     const imgLabel = document.getElementById('stretch-image-label');
     if (imgUrl) {
-      if (imgEl.src !== imgUrl) {
+      if (imgEl.getAttribute('src') !== imgUrl) {
         imgEl.src = imgUrl;
         imgLabel.textContent = cur.name || '';
       }
