@@ -121,6 +121,31 @@
     #posture-badge.good   { border-color: var(--good);   color: var(--good); }
     #posture-badge.warn   { border-color: var(--warn);   color: var(--warn); }
     #posture-badge.danger { border-color: var(--danger); color: var(--danger); }
+    /* ── Stretch image below camera ── */
+    #stretch-image-box {
+      display: none;
+      margin-top: 16px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+    }
+    #stretch-image-box img {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-height: 260px;
+      object-fit: contain;
+      background: #111;
+    }
+    #stretch-image-label {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
     #posture-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
@@ -391,6 +416,10 @@
     <div id="posture-badge">
       <div id="posture-dot"></div>
       <span id="posture-label">Detecting…</span>
+    </div>
+    <div id="stretch-image-box">
+      <img id="stretch-image" src="" alt="Stretch demonstration" />
+      <div id="stretch-image-label"></div>
     </div>
   </div>
 
@@ -703,6 +732,7 @@
       countdown.className = '';
       fill.style.width = '0%';
       document.getElementById('stop-routine-btn').style.display = 'none';
+      document.getElementById('stretch-image-box').style.display = 'none';
       return;
     }
 
@@ -723,6 +753,7 @@
         document.getElementById('start-routine-btn').style.display = 'block';
       }
       document.getElementById('stop-routine-btn').style.display = 'none';
+      document.getElementById('stretch-image-box').style.display = 'none';
       if (routinePollHandle) {
         clearInterval(routinePollHandle);
         routinePollHandle = null;
@@ -733,6 +764,21 @@
     }
 
     const cur = status.current_stretch || {};
+
+    // Show stretch image (gif preferred, fallback to image_url)
+    const imgUrl = cur.gif_url || cur.image_url || '';
+    const imgBox = document.getElementById('stretch-image-box');
+    const imgEl = document.getElementById('stretch-image');
+    const imgLabel = document.getElementById('stretch-image-label');
+    if (imgUrl) {
+      if (imgEl.src !== imgUrl) {
+        imgEl.src = imgUrl;
+        imgLabel.textContent = cur.name || '';
+      }
+      imgBox.style.display = 'block';
+    } else {
+      imgBox.style.display = 'none';
+    }
     document.getElementById('routine-title').textContent =
       `Now: ${cur.name || 'Stretch'} (${(status.index || 0) + 1}/${status.total || 5})`;
     document.getElementById('routine-feedback').textContent = status.feedback || 'Adjust into the target pose.';
