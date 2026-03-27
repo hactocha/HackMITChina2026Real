@@ -128,7 +128,7 @@ def validate_S01(lm):
     if not ok:
         return False, msg
     ear_l_sh, ear_r_sh, _ = _head_tilt_metrics(lm)
-    good = min(ear_l_sh, ear_r_sh) < 0.18
+    good = min(ear_l_sh, ear_r_sh) < 0.10
     return good, "Tilt one ear closer to your shoulder while keeping shoulders relaxed."
 
 
@@ -137,7 +137,7 @@ def validate_S02(lm):
     if not ok:
         return False, msg
     eye_mid_y = (lm[2].y + lm[5].y) / 2.0
-    chin_tucked = (lm[0].y - eye_mid_y) > 0.05
+    chin_tucked = (lm[0].y - eye_mid_y) > 0.04
     return chin_tucked, "Tuck your chin down gently as if making a double chin."
 
 
@@ -146,7 +146,7 @@ def validate_S03(lm):
     if not ok:
         return False, msg
     shoulder_mid_x = (lm[11].x + lm[12].x) / 2.0
-    rotated = abs(lm[0].x - shoulder_mid_x) > 0.06
+    rotated = abs(lm[0].x - shoulder_mid_x) > 0.09
     return rotated, "Rotate your head to one side while keeping shoulders still."
 
 
@@ -155,7 +155,7 @@ def validate_S04(lm):
     if not ok:
         return False, msg
     ear_l_sh, ear_r_sh, shoulder_delta = _head_tilt_metrics(lm)
-    good = min(ear_l_sh, ear_r_sh) < 0.18 and shoulder_delta < 0.08
+    good = min(ear_l_sh, ear_r_sh) < 0.10 and shoulder_delta < 0.08
     return good, "Tilt your head to one side and keep shoulders down."
 
 
@@ -163,7 +163,9 @@ def validate_S05(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
-    neck_bent = abs(lm[0].y - ((lm[11].y + lm[12].y) / 2.0)) < 0.35
+    shoulder_mid_x = (lm[11].x + lm[12].x) / 2.0
+    shoulder_mid_y = (lm[11].y + lm[12].y) / 2.0
+    neck_bent = (abs(lm[0].y - shoulder_mid_y) < 0.12) or (abs(lm[0].x - shoulder_mid_x) > 0.10)
     return neck_bent, "Move through a gentle head arc with chin lowered slightly."
 
 
