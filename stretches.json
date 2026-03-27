@@ -2,7 +2,6 @@
   {
     "id": "S01",
     "name": "Neck Side Tilt",
-    "image_url": "https://www.arthritis-uk.org/media/bafj4eye/neck_tilt_stretch-500x500.png",
     "target_muscle": "Sternocleidomastoid",
     "duration_seconds": 30,
     "posture_tags": ["neck", "forward_head"],
@@ -15,7 +14,8 @@
     "camera_angle": "front",
     "camera_instruction": "Sit facing the camera so it can see your head tilt to each side.",
     "difficulty": "Easy",
-    "emoji": "🧘"
+    "emoji": "🧘",
+    "image_url": "https://www.arthritis-uk.org/media/bafj4eye/neck_tilt_stretch-500x500.png"
   },
   {
     "id": "S02",
@@ -32,11 +32,13 @@
     "camera_angle": "side",
     "camera_instruction": "Sit with your right side facing the camera so it can see your chin tuck and neck curve.",
     "difficulty": "Easy",
-    "emoji": "😌"
+    "emoji": "😌",
+    "image_url": "https://northernmyotherapy.com.au/wp-content/uploads/2021/04/neck-stretch-1.jpg"
   },
   {
     "id": "S03",
     "name": "Neck Rotation Stretch",
+    
     "target_muscle": "Cervical Rotators",
     "duration_seconds": 30,
     "posture_tags": ["neck", "forward_head"],
@@ -49,7 +51,8 @@
     "camera_angle": "standing_front",
     "camera_instruction": "Stand facing the camera so it can verify your head rotation is even on both sides.",
     "difficulty": "Easy",
-    "emoji": "🔄"
+    "emoji": "🔄",
+    "gif_url": "https://i.makeagif.com/media/7-12-2024/4MdbIg.gif"
   },
   {
     "id": "S04",
@@ -66,7 +69,8 @@
     "camera_angle": "front",
     "camera_instruction": "Sit facing the camera so it can see your head tilt and confirm your shoulder stays down.",
     "difficulty": "Easy",
-    "emoji": "💆"
+    "emoji": "💆",
+    "image_url": "https://learnmuscles.com/wp-content/uploads/2017/10/Upper-trapezius-stretch-636x1024.jpg"
   },
   {
     "id": "S05",
@@ -83,7 +87,8 @@
     "camera_angle": "side",
     "camera_instruction": "Sit with your side facing the camera so it can track the arc of your head movement.",
     "difficulty": "Easy",
-    "emoji": "⭕"
+    "emoji": "⭕",
+    "gif_url": "https://spotebi.com/wp-content/uploads/2015/03/neck-rolls-exercise-illustration.gif"
   },
   {
     "id": "S06",
@@ -100,7 +105,8 @@
     "camera_angle": "front",
     "camera_instruction": "Sit or stand facing the camera so it can see both shoulders moving in equal circles.",
     "difficulty": "Easy",
-    "emoji": "🔁"
+    "emoji": "🔁",
+    "gif_url": "https://spotebi.com/wp-content/uploads/2015/03/shoulder-rolls-exercise-illustration.gif"
   },
   {
     "id": "S07",
@@ -117,7 +123,8 @@
     "camera_angle": "standing_front",
     "camera_instruction": "Stand facing the camera with arms raised so it can see your chest opening and elbows at shoulder level.",
     "difficulty": "Easy",
-    "emoji": "🚪"
+    "emoji": "🚪",
+    "gif_url": "https://i.makeagif.com/media/5-04-2025/IuVHwU.gif"
   },
   {
     "id": "S08",
@@ -134,7 +141,8 @@
     "camera_angle": "front",
     "camera_instruction": "Sit facing the camera so it can confirm both shoulder blades are moving equally.",
     "difficulty": "Easy",
-    "emoji": "💪"
+    "emoji": "💪",
+    "gif_url": "https://media3.s-nbcnews.com/j/newscms/2019_21/2863711/better_goalpostsqueeze_dfbc81968ab55f982829e7d3b9005755.fit-560w.gif"
   },
   {
     "id": "S09",
@@ -151,7 +159,8 @@
     "camera_angle": "standing_side",
     "camera_instruction": "Stand with your right side facing the camera so it can see your arm crossing your body at the correct height.",
     "difficulty": "Easy",
-    "emoji": "🤗"
+    "emoji": "🤗",
+    "gif_url": "https://cdn.jefit.com/assets/img/exercises/gifs/882.gif"
   },
   {
     "id": "S10",
@@ -168,7 +177,8 @@
     "camera_angle": "standing_side",
     "camera_instruction": "Stand with your side facing the camera so it can see your arms behind your back and your chest lifting forward.",
     "difficulty": "Easy",
-    "emoji": "🌟"
+    "emoji": "🌟",
+    "gif_url": "https://cdn.jefit.com/assets/img/exercises/gifs/846.gif"
   },
   {
     "id": "S11",
@@ -185,7 +195,8 @@
     "camera_angle": "side",
     "camera_instruction": "Sit with your side facing the camera so it can see the full rotation of your spine.",
     "difficulty": "Easy",
-    "emoji": "🌀"
+    "emoji": "🌀",
+    "gif_url": "https://miro.medium.com/v2/resize:fit:1400/1*cG4_J-L-XzN4ng6hcABJ8A.gif"
   },
   {
     "id": "S12",
@@ -202,7 +213,8 @@
     "camera_angle": "side",
     "camera_instruction": "Sit with your side facing the camera so it can measure how far your upper body folds forward.",
     "difficulty": "Easy",
-    "emoji": "🌿"
+    "emoji": "🌿",
+    "gif_url": "https://media.post.rvohealth.io/wp-content/uploads/sites/2/2021/02/Seated-Forward-Fold-Paschimottanasana.gif"
   },
   {
     "id": "S13",
@@ -219,7 +231,8 @@
     "camera_angle": "side",
     "camera_instruction": "Sit with your side facing the camera so it can see your spine arching and rounding clearly.",
     "difficulty": "Easy",
-    "emoji": "🐱"
+    "emoji": "🐱",
+    "gif_url": "https://miro.medium.com/1*y2gwCLlL8KiLVlosm0fe0w.gif"
   },
   {
     "id": "S14",
@@ -236,7 +249,8 @@
     "camera_angle": "standing_side",
     "camera_instruction": "Stand with your side facing the camera so it can see the backward arch in your lower back.",
     "difficulty": "Easy",
-    "emoji": "🔙"
+    "emoji": "🔙",
+    "gif_url": "https://media.post.rvohealth.io/wp-content/uploads/2020/11/Standing-extension.gif"
   },
   {
     "id": "S15",
@@ -253,7 +267,8 @@
     "camera_angle": "side",
     "camera_instruction": "Sit with your side facing the camera so it can confirm your back stays upright while your hip flexes.",
     "difficulty": "Easy",
-    "emoji": "🦵"
+    "emoji": "🦵",
+    "gif_url": "https://i0.wp.com/post.healthline.com/wp-content/uploads/2023/07/Sitting-stretch.gif?w=1155&h=840"
   },
   {
     "id": "S16",
@@ -270,7 +285,8 @@
     "camera_angle": "front",
     "camera_instruction": "Hold your arm out toward the camera so it can see the angle of your wrist bend clearly.",
     "difficulty": "Easy",
-    "emoji": "🤲"
+    "emoji": "🤲",
+    "gif_url": "https://i.makeagif.com/media/7-22-2024/exC1Bw.gif"
   },
   {
     "id": "S17",
@@ -287,7 +303,8 @@
     "camera_angle": "front",
     "camera_instruction": "Hold your arm straight out toward the camera so it can see the top of your wrist bending downward.",
     "difficulty": "Easy",
-    "emoji": "🖐️"
+    "emoji": "🖐️",
+    "gif_url": "https://images.squarespace-cdn.com/content/v1/5a620a85d55b41e7233c5243/19d3af95-6141-4b8c-8315-7254e01626bc/wrist+ext.gif"
   },
   {
     "id": "S18",
@@ -304,7 +321,8 @@
     "camera_angle": "front",
     "camera_instruction": "Face the camera with your arm extended sideways so it can see the rotation of your palm clearly.",
     "difficulty": "Easy",
-    "emoji": "🔃"
+    "emoji": "🔃",
+    "gif_url": "https://www.vissco.com/wp-content/uploads/animation/sub/supination-stretch-with-elbow-extended.gif"
   },
   {
     "id": "S19",
@@ -321,7 +339,8 @@
     "camera_angle": "front",
     "camera_instruction": "Face the camera with your hands centered on your chest so it can track the angle of your wrists.",
     "difficulty": "Easy",
-    "emoji": "🙏"
+    "emoji": "🙏",
+    "gif_url": "https://www.vissco.com/wp-content/uploads/animation/sub/prayer-stretch.gif"
   },
   {
     "id": "S20",
@@ -338,6 +357,7 @@
     "camera_angle": "front",
     "camera_instruction": "Hold your hands up facing the camera so it can see all fingers spreading fully and evenly.",
     "difficulty": "Easy",
-    "emoji": "🖐"
+    "emoji": "🖐",
+    "gif_url": "https://www.thetimes.com/imageserver/image/%2Fc162639d-2987-42b5-937d-5f48b51e39f6.gif?crop=640%2C360%2C0%2C0"
   }
 ]
