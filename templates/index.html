@@ -176,6 +176,13 @@
     #start-routine-btn:hover:not(:disabled) {
       background: rgba(111, 165, 111, 0.15);
     }
+    #stop-routine-btn {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      display: none;
+    }
+    #stop-routine-btn:hover { background: rgba(217, 122, 103, 0.15); }
 
     .spinner {
       width: 16px; height: 16px;
@@ -192,7 +199,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 16px;
-      margin-top: 20px
+      margin-top: 20px;
     }
 
     .stretch-card {
@@ -367,10 +374,12 @@
       <span id="btn-text">✨ Recommend stretches</span>
     </button>
     <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
+    <button id="stop-routine-btn" onclick="stopRoutine()">⬛ Stop routine</button>
     <div id="message"></div>
     <div id="routine-panel">
       <div id="routine-title">Routine ready</div>
       <div id="routine-feedback">Keep your full body visible to begin.</div>
+      <div id="routine-countdown" style="font-size:2.2rem;font-weight:700;text-align:center;margin:10px 0;display:none;"></div>
       <div id="routine-meta"></div>
       <div id="routine-progress-wrap">
         <div id="routine-progress-fill"></div>
@@ -425,13 +434,11 @@
       const badge = document.getElementById('posture-badge');
       document.getElementById('posture-label').textContent = result;
       badge.className = 'posture-badge ' + (POSTURE_CLASS[result] || '');
-      // update id too (kept for CSS selector)
       badge.id = 'posture-badge';
-      badge.classList.add(POSTURE_CLASS[result] || '');
     } catch { /* ignore */ }
   }
   pollPosture();
-  setInterval(pollPosture, 700);
+  setInterval(pollPosture, 1500);
 
   // ── Recommendations ─────────────────────────────────────────────
   async function getRecommendations() {
@@ -481,11 +488,20 @@
     }
   }
 
+  let thinkingTimeout = null;
   function setLoading(on) {
     const btn = document.getElementById('recommend-btn');
     btn.disabled = on;
     document.getElementById('spinner').style.display = on ? 'block' : 'none';
-    document.getElementById('btn-text').textContent = on ? 'Thinking…' : '✨ Recommend stretches';
+    if (on) {
+      document.getElementById('btn-text').textContent = 'Thinking…';
+      thinkingTimeout = setTimeout(() => {
+        document.getElementById('btn-text').textContent = 'Still thinking…';
+      }, 4000);
+    } else {
+      clearTimeout(thinkingTimeout);
+      document.getElementById('btn-text').textContent = '✨ Recommend stretches';
+    }
   }
 
   function showMessage(text, type) {
@@ -535,11 +551,25 @@
         return;
       }
       showMessage('Routine started. Hold each stretch when the form status turns correct.', 'info');
+      document.getElementById('start-routine-btn').style.display = 'none';
+      document.getElementById('stop-routine-btn').style.display = 'block';
       document.getElementById('routine-panel').style.display = 'block';
       startRoutinePolling();
     } catch (err) {
       showMessage('Could not start routine: ' + err.message, 'error');
     }
+  }
+
+  async function stopRoutine() {
+    try {
+      await fetch('/routine/stop', { method: 'POST' });
+    } catch { /* ignore */ }
+    document.getElementById('stop-routine-btn').style.display = 'none';
+    document.getElementById('start-routine-btn').style.display = 'block';
+    document.getElementById('feed-wrapper').style.boxShadow = 'none';
+    document.getElementById('routine-countdown').style.display = 'none';
+    resetRoutineUi();
+    clearMessage();
   }
 
   function startRoutinePolling() {
@@ -573,11 +603,15 @@
 
     if (status.state === 'finished') {
       panel.classList.add('finished');
-      document.getElementById('routine-title').textContent = 'Routine complete';
+      document.getElementById('routine-title').textContent = 'Routine complete 🎉';
       document.getElementById('routine-feedback').textContent = status.done_message || 'Great job completing all stretches.';
       document.getElementById('routine-meta').textContent = `${status.completed_count}/${status.total} completed`;
+      document.getElementById('routine-countdown').style.display = 'none';
       fill.style.width = '100%';
       fill.classList.add('correct');
+      document.getElementById('feed-wrapper').style.boxShadow = 'none';
+      document.getElementById('stop-routine-btn').style.display = 'none';
+      document.getElementById('start-routine-btn').style.display = 'block';
       if (routinePollHandle) {
         clearInterval(routinePollHandle);
         routinePollHandle = null;
@@ -594,11 +628,18 @@
     const pct = Math.max(0, Math.min(100, ((status.hold_elapsed_s || 0) / Math.max(status.hold_target_s || 1, 1)) * 100));
     fill.style.width = pct.toFixed(1) + '%';
 
+    // Countdown timer
+    const remaining = Math.max(0, Math.ceil((status.hold_target_s || 0) - (status.hold_elapsed_s || 0)));
+    const countdown = document.getElementById('routine-countdown');
     if (status.is_correct) {
+      countdown.style.display = 'block';
+      countdown.textContent = remaining + 's';
+      countdown.style.color = 'var(--good)';
       panel.classList.add('correct');
       fill.classList.add('correct');
       document.getElementById('feed-wrapper').style.boxShadow = '0 0 0 3px rgba(141,207,141,0.7)';
     } else {
+      countdown.style.display = 'none';
       panel.classList.add('incorrect');
       document.getElementById('feed-wrapper').style.boxShadow = 'none';
     }
