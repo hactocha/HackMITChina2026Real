@@ -207,7 +207,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 16px;
-      margin-top: 20px
+      margin-top: 20px;
     }
 
     .stretch-card {
@@ -515,9 +515,6 @@
       const badge = document.getElementById('posture-badge');
       document.getElementById('posture-label').textContent = result;
       badge.className = 'posture-badge ' + (POSTURE_CLASS[result] || '');
-      // update id too (kept for CSS selector)
-      badge.id = 'posture-badge';
-      badge.classList.add(POSTURE_CLASS[result] || '');
     } catch { /* ignore */ }
   }
   pollPosture();
