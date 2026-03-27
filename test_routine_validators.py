@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StretchAI</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #101a14;
+      --surface: #18261d;
+      --card: #213125;
+      --accent: #6fa56f;
+      --accent-hover: #84b784;
+      --good: #8dcf8d;
+      --warn: #d1b66a;
+      --danger: #d97a67;
+      --text: #e8f1e8;
+      --muted: #b2c5b2;
+      --border: #314736;
+      --radius: 14px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    header .logo { font-size: 1.6rem; }
+    header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.3px; }
+    header h1 span { color: var(--accent); }
+    .health-dot {
+      margin-left: auto;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 6px var(--good);
+    }
+    .health-dot.offline { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+
+    /* ── Main layout ── */
+    main {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 24px;
+      padding: 28px 32px;
+      flex: 1;
+    }
+    @media (max-width: 860px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+    .card h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Webcam feed ── */
+    .feed-wrapper {
+      position: relative;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+    }
+    .feed-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .feed-offline {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .feed-offline .icon { font-size: 2.5rem; }
+
+    /* ── Posture badge ── */
+    #posture-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: background 0.3s, border-color 0.3s;
+    }
+    #posture-badge.good   { border-color: var(--good);   color: var(--good); }
+    #posture-badge.warn   { border-color: var(--warn);   color: var(--warn); }
+    #posture-badge.danger { border-color: var(--danger); color: var(--danger); }
+    #posture-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* ── Pain input panel ── */
+    .pain-panel { display: flex; flex-direction: column; gap: 14px; }
+
+    textarea {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 12px 14px;
+      resize: vertical;
+      min-height: 90px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 12px 20px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button:active { transform: scale(0.98); }
+
+    #recommend-btn {
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #recommend-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    #recommend-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #start-routine-btn {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--accent);
+      display: none;
+    }
+    #start-routine-btn:hover:not(:disabled) {
+      background: rgba(111, 165, 111, 0.15);
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Stretch cards grid ── */
+    #stretches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 20px
+    }
+
+    .stretch-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: fadeUp 0.3s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .stretch-card .emoji { font-size: 2rem; }
+    .stretch-card .name { font-size: 1rem; font-weight: 700; }
+    .stretch-card .muscle {
+      font-size: 0.78rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .stretch-card .duration {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .stretch-card ol {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .stretch-card ol li { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+    .stretch-card .camera-tip {
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: var(--card);
+      border-radius: 7px;
+      padding: 7px 10px;
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+    }
+
+    /* ── Error / info message ── */
+    #message {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      display: none;
+    }
+    #message.error { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+    #message.info  { background: rgba(108,99,255,0.15); color: var(--accent); border: 1px solid rgba(108,99,255,0.3); }
+
+    #routine-panel {
+      display: none;
+      margin-top: 10px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    #routine-panel.correct { border-color: var(--good); }
+    #routine-panel.incorrect { border-color: var(--warn); }
+    #routine-panel.finished { border-color: var(--good); }
+    #routine-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    #routine-feedback {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+    #routine-meta {
+      margin-top: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    #routine-progress-wrap {
+      margin-top: 10px;
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--card);
+      overflow: hidden;
+    }
+    #routine-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--warn);
+      transition: width 0.2s linear, background 0.2s linear;
+    }
+    #routine-progress-fill.correct {
+      background: var(--good);
+    }
+
+    /* ── Bottom stretch browser ── */
+    #all-stretches-section { padding: 0 32px 32px; }
+    #all-stretches-section h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    #all-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .mini-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.88rem;
+    }
+    .mini-card .emoji { font-size: 1.4rem; }
+    .mini-card .info { display: flex; flex-direction: column; gap: 2px; }
+    .mini-card .info .n { font-weight: 600; }
+    .mini-card .info .m { font-size: 0.76rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">🧘</span>
+  <h1>Stretch<span>AI</span></h1>
+  <div class="health-dot" id="health-dot" title="Server status"></div>
+</header>
+
+<main>
+  <!-- Left: webcam + posture -->
+  <div class="card">
+    <h2>Live Posture Detection</h2>
+    <div class="feed-wrapper" id="feed-wrapper">
+      <img id="video-feed" src="/video_feed" alt="Webcam feed"
+           onerror="showFeedOffline()" />
+      <div class="feed-offline" id="feed-offline" style="display:none">
+        <div class="icon">📷</div>
+        <div>Webcam not available</div>
+      </div>
+    </div>
+    <div id="posture-badge">
+      <div id="posture-dot"></div>
+      <span id="posture-label">Detecting…</span>
+    </div>
+  </div>
+
+  <!-- Right: recommend panel -->
+  <div class="card pain-panel">
+    <h2>Get Stretch Recommendations</h2>
+    <label for="pain-input" style="font-size:0.9rem;color:var(--muted)">
+      Describe where it hurts or feels tight:
+    </label>
+    <textarea
+      id="pain-input"
+      placeholder="e.g. my lower back is stiff and my neck aches from looking at screens all day…"
+    ></textarea>
+    <button id="recommend-btn" onclick="getRecommendations()">
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-text">✨ Recommend stretches</span>
+    </button>
+    <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
+    <div id="message"></div>
+    <div id="routine-panel">
+      <div id="routine-title">Routine ready</div>
+      <div id="routine-feedback">Keep your full body visible to begin.</div>
+      <div id="routine-meta"></div>
+      <div id="routine-progress-wrap">
+        <div id="routine-progress-fill"></div>
+      </div>
+    </div>
+    <div id="stretches-grid"></div>
+  </div>
+</main>
+
+<!-- Full stretch library browser -->
+<section id="all-stretches-section">
+  <h2>Full Stretch Library</h2>
+  <div id="all-grid"></div>
+</section>
+
+<script>
+  let recommendedStretches = [];
+  let routinePollHandle = null;
+
+  // ── Health check ────────────────────────────────────────────────
+  async function checkHealth() {
+    try {
+      const r = await fetch('/health');
+      document.getElementById('health-dot').classList.toggle('offline', !r.ok);
+    } catch {
+      document.getElementById('health-dot').classList.add('offline');
+    }
+  }
+  checkHealth();
+  setInterval(checkHealth, 15000);
+
+  // ── Webcam offline handling ──────────────────────────────────────
+  function showFeedOffline() {
+    document.getElementById('video-feed').style.display = 'none';
+    document.getElementById('feed-offline').style.display = 'flex';
+  }
+
+  // ── Posture polling ─────────────────────────────────────────────
+  const POSTURE_CLASS = {
+    'Good Posture':        'good',
+    'Forward Head Tilt':   'warn',
+    'Rounded Shoulders':   'warn',
+    'Wrist Strain Risk':   'warn',
+    'Slouching':           'danger',
+  };
+
+  async function pollPosture() {
+    try {
+      const r = await fetch('/posture');
+      if (!r.ok) return;
+      const { result } = await r.json();
+      const badge = document.getElementById('posture-badge');
+      document.getElementById('posture-label').textContent = result;
+      badge.className = 'posture-badge ' + (POSTURE_CLASS[result] || '');
+      // update id too (kept for CSS selector)
+      badge.id = 'posture-badge';
+      badge.classList.add(POSTURE_CLASS[result] || '');
+    } catch { /* ignore */ }
+  }
+  pollPosture();
+  setInterval(pollPosture, 700);
+
+  // ── Recommendations ─────────────────────────────────────────────
+  async function getRecommendations() {
+    const painText = document.getElementById('pain-input').value.trim();
+    if (!painText) {
+      showMessage('Please describe your pain or discomfort first.', 'error');
+      return;
+    }
+
+    // Get current posture
+    let posture = 'Good Posture';
+    try {
+      const r = await fetch('/posture');
+      if (r.ok) ({ result: posture } = await r.json());
+    } catch { /* use default */ }
+
+    setLoading(true);
+    clearMessage();
+    clearGrid();
+    resetRoutineUi();
+
+    try {
+      const r = await fetch('/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posture, pain_text: painText }),
+      });
+      const data = await r.json();
+
+      if (data.error) {
+        showMessage('⚠️ ' + data.error + ' — showing fallback stretches.', 'error');
+      }
+
+      const stretches = data.stretches || [];
+      recommendedStretches = stretches;
+      renderStretches(stretches);
+      const startBtn = document.getElementById('start-routine-btn');
+      startBtn.style.display = stretches.length > 0 ? 'block' : 'none';
+      startBtn.disabled = stretches.length !== 5;
+      startBtn.title = stretches.length === 5
+        ? 'Start guided routine'
+        : 'Need exactly 5 stretches to start routine';
+    } catch (err) {
+      showMessage('Network error: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function setLoading(on) {
+    const btn = document.getElementById('recommend-btn');
+    btn.disabled = on;
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('btn-text').textContent = on ? 'Thinking…' : '✨ Recommend stretches';
+  }
+
+  function showMessage(text, type) {
+    const el = document.getElementById('message');
+    el.textContent = text;
+    el.className = type;
+    el.style.display = 'block';
+  }
+  function clearMessage() {
+    const el = document.getElementById('message');
+    el.style.display = 'none';
+  }
+  function clearGrid() {
+    document.getElementById('stretches-grid').innerHTML = '';
+  }
+
+  function resetRoutineUi() {
+    if (routinePollHandle) {
+      clearInterval(routinePollHandle);
+      routinePollHandle = null;
+    }
+    const panel = document.getElementById('routine-panel');
+    panel.style.display = 'none';
+    panel.className = '';
+    document.getElementById('routine-title').textContent = 'Routine ready';
+    document.getElementById('routine-feedback').textContent = '';
+    document.getElementById('routine-meta').textContent = '';
+    const fill = document.getElementById('routine-progress-fill');
+    fill.style.width = '0%';
+    fill.className = '';
+  }
+
+  async function startRoutine() {
+    if (!recommendedStretches.length) {
+      showMessage('Get recommendations first so the routine knows which 5 stretches to run.', 'error');
+      return;
+    }
+    try {
+      const r = await fetch('/routine/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stretch_ids: recommendedStretches.map(s => s.id) }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        showMessage(data.error || 'Failed to start routine.', 'error');
+        return;
+      }
+      showMessage('Routine started. Hold each stretch when the form status turns correct.', 'info');
+      document.getElementById('routine-panel').style.display = 'block';
+      startRoutinePolling();
+    } catch (err) {
+      showMessage('Could not start routine: ' + err.message, 'error');
+    }
+  }
+
+  function startRoutinePolling() {
+    if (routinePollHandle) clearInterval(routinePollHandle);
+    const tick = async () => {
+      try {
+        const r = await fetch('/routine/status');
+        if (!r.ok) return;
+        const s = await r.json();
+        renderRoutineStatus(s);
+      } catch { /* ignore */ }
+    };
+    tick();
+    routinePollHandle = setInterval(tick, 250);
+  }
+
+  function renderRoutineStatus(status) {
+    const panel = document.getElementById('routine-panel');
+    panel.style.display = 'block';
+    panel.className = '';
+    const fill = document.getElementById('routine-progress-fill');
+    fill.className = '';
+
+    if (status.state === 'inactive') {
+      document.getElementById('routine-title').textContent = 'Routine not started';
+      document.getElementById('routine-feedback').textContent = 'Click Start stretch routine to begin.';
+      document.getElementById('routine-meta').textContent = '';
+      fill.style.width = '0%';
+      return;
+    }
+
+    if (status.state === 'finished') {
+      panel.classList.add('finished');
+      document.getElementById('routine-title').textContent = 'Routine complete';
+      document.getElementById('routine-feedback').textContent = status.done_message || 'Great job completing all stretches.';
+      document.getElementById('routine-meta').textContent = `${status.completed_count}/${status.total} completed`;
+      fill.style.width = '100%';
+      fill.classList.add('correct');
+      if (routinePollHandle) {
+        clearInterval(routinePollHandle);
+        routinePollHandle = null;
+      }
+      return;
+    }
+
+    const cur = status.current_stretch || {};
+    document.getElementById('routine-title').textContent =
+      `Now: ${cur.name || 'Stretch'} (${(status.index || 0) + 1}/${status.total || 5})`;
+    document.getElementById('routine-feedback').textContent = status.feedback || 'Adjust into the target pose.';
+    document.getElementById('routine-meta').textContent =
+      `Hold ${status.hold_elapsed_s || 0}s / ${status.hold_target_s || 0}s`;
+    const pct = Math.max(0, Math.min(100, ((status.hold_elapsed_s || 0) / Math.max(status.hold_target_s || 1, 1)) * 100));
+    fill.style.width = pct.toFixed(1) + '%';
+
+    if (status.is_correct) {
+      panel.classList.add('correct');
+      fill.classList.add('correct');
+      document.getElementById('feed-wrapper').style.boxShadow = '0 0 0 3px rgba(141,207,141,0.7)';
+    } else {
+      panel.classList.add('incorrect');
+      document.getElementById('feed-wrapper').style.boxShadow = 'none';
+    }
+  }
+
+  function renderStretches(stretches) {
+    const grid = document.getElementById('stretches-grid');
+    stretches.forEach((s, i) => {
+      const card = document.createElement('div');
+      card.className = 'stretch-card';
+      card.style.animationDelay = (i * 0.07) + 's';
+      card.innerHTML = `
+        <div class="emoji">${s.emoji || '🧘'}</div>
+        <div class="name">${esc(s.name)}</div>
+        <div class="muscle">${esc(s.target_muscle)}</div>
+        <div class="duration">⏱ ${s.duration_seconds}s</div>
+        <ol>${(s.steps || []).map(st => `<li>${esc(st)}</li>`).join('')}</ol>
+        <div class="camera-tip">📸 <span>${esc(s.camera_instruction || '')}</span></div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // ── Full library browser ─────────────────────────────────────────
+  async function loadLibrary() {
+    try {
+      const r = await fetch('/stretches');
+      if (!r.ok) return;
+      const stretches = await r.json();
+      const grid = document.getElementById('all-grid');
+      stretches.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'mini-card';
+        card.innerHTML = `
+          <div class="emoji">${s.emoji || '🧘'}</div>
+          <div class="info">
+            <div class="n">${esc(s.name)}</div>
+            <div class="m">${esc(s.target_muscle)} · ${s.duration_seconds}s</div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    } catch { /* ignore */ }
+  }
+  loadLibrary();
+
+  // ── Utility ──────────────────────────────────────────────────────
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
