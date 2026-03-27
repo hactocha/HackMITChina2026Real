@@ -176,6 +176,21 @@
     #start-routine-btn:hover:not(:disabled) {
       background: rgba(111, 165, 111, 0.15);
     }
+    #stop-routine-btn {
+      background: rgba(217, 122, 103, 0.15);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      display: none;
+    }
+    #stop-routine-btn:hover:not(:disabled) {
+      background: rgba(217, 122, 103, 0.25);
+    }
+    #thinking-hint {
+      display: none;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: -6px;
+    }
 
     .spinner {
       width: 16px; height: 16px;
@@ -277,6 +292,17 @@
       font-size: 0.82rem;
       color: var(--muted);
     }
+    #routine-countdown {
+      margin-top: 8px;
+      font-size: 2.1rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    #routine-countdown.urgent {
+      color: var(--warn);
+    }
     #routine-progress-wrap {
       margin-top: 10px;
       width: 100%;
@@ -375,12 +401,15 @@
       <div class="spinner" id="spinner"></div>
       <span id="btn-text">✨ Recommend stretches</span>
     </button>
+    <div id="thinking-hint">Still thinking... Ollama can take a few extra seconds.</div>
     <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
+    <button id="stop-routine-btn" onclick="stopRoutine()">■ Stop routine</button>
     <div id="message"></div>
     <div id="routine-panel">
       <div id="routine-title">Routine ready</div>
       <div id="routine-feedback">Keep your full body visible to begin.</div>
       <div id="routine-meta"></div>
+      <div id="routine-countdown">--s remaining</div>
       <div id="routine-progress-wrap">
         <div id="routine-progress-fill"></div>
       </div>
@@ -401,6 +430,7 @@
   let lastRoutineIndex = null;
   let lastRoutineState = null;
   let soundEnabled = false;
+  let stillThinkingTimeout = null;
 
   function playRoutineBell() {
     try {
@@ -491,7 +521,7 @@
     } catch { /* ignore */ }
   }
   pollPosture();
-  setInterval(pollPosture, 700);
+  setInterval(pollPosture, 1500);
 
   // ── Recommendations ─────────────────────────────────────────────
   async function getRecommendations() {
@@ -546,6 +576,19 @@
     btn.disabled = on;
     document.getElementById('spinner').style.display = on ? 'block' : 'none';
     document.getElementById('btn-text').textContent = on ? 'Thinking…' : '✨ Recommend stretches';
+
+    const hint = document.getElementById('thinking-hint');
+    hint.style.display = 'none';
+    if (stillThinkingTimeout) {
+      clearTimeout(stillThinkingTimeout);
+      stillThinkingTimeout = null;
+    }
+    if (on) {
+      stillThinkingTimeout = setTimeout(() => {
+        document.getElementById('btn-text').textContent = 'Still thinking…';
+        hint.style.display = 'block';
+      }, 3000);
+    }
   }
 
   function showMessage(text, type) {
@@ -573,9 +616,14 @@
     document.getElementById('routine-title').textContent = 'Routine ready';
     document.getElementById('routine-feedback').textContent = '';
     document.getElementById('routine-meta').textContent = '';
+    const countdown = document.getElementById('routine-countdown');
+    countdown.textContent = '--s remaining';
+    countdown.className = '';
     const fill = document.getElementById('routine-progress-fill');
     fill.style.width = '0%';
     fill.className = '';
+    document.getElementById('feed-wrapper').style.boxShadow = 'none';
+    document.getElementById('stop-routine-btn').style.display = 'none';
     lastRoutineIndex = null;
     lastRoutineState = null;
   }
@@ -598,10 +646,25 @@
       }
       showMessage('Routine started. Hold each stretch when the form status turns correct.', 'info');
       document.getElementById('routine-panel').style.display = 'block';
+      document.getElementById('start-routine-btn').style.display = 'none';
+      document.getElementById('stop-routine-btn').style.display = 'block';
       startRoutinePolling();
     } catch (err) {
       showMessage('Could not start routine: ' + err.message, 'error');
     }
+  }
+
+  async function stopRoutine() {
+    try {
+      await fetch('/routine/stop', { method: 'POST' });
+    } catch (_) {
+      // UI reset still works even if network briefly fails.
+    }
+    resetRoutineUi();
+    if (recommendedStretches.length) {
+      document.getElementById('start-routine-btn').style.display = 'block';
+    }
+    showMessage('Routine stopped.', 'info');
   }
 
   function startRoutinePolling() {
@@ -629,7 +692,11 @@
       document.getElementById('routine-title').textContent = 'Routine not started';
       document.getElementById('routine-feedback').textContent = 'Click Start stretch routine to begin.';
       document.getElementById('routine-meta').textContent = '';
+      const countdown = document.getElementById('routine-countdown');
+      countdown.textContent = '--s remaining';
+      countdown.className = '';
       fill.style.width = '0%';
+      document.getElementById('stop-routine-btn').style.display = 'none';
       return;
     }
 
@@ -641,8 +708,15 @@
       document.getElementById('routine-title').textContent = 'Routine complete';
       document.getElementById('routine-feedback').textContent = status.done_message || 'Great job completing all stretches.';
       document.getElementById('routine-meta').textContent = `${status.completed_count}/${status.total} completed`;
+      const countdown = document.getElementById('routine-countdown');
+      countdown.textContent = '0s remaining';
+      countdown.className = '';
       fill.style.width = '100%';
       fill.classList.add('correct');
+      if (recommendedStretches.length) {
+        document.getElementById('start-routine-btn').style.display = 'block';
+      }
+      document.getElementById('stop-routine-btn').style.display = 'none';
       if (routinePollHandle) {
         clearInterval(routinePollHandle);
         routinePollHandle = null;
@@ -658,8 +732,13 @@
     document.getElementById('routine-feedback').textContent = status.feedback || 'Adjust into the target pose.';
     document.getElementById('routine-meta').textContent =
       `Hold ${status.hold_elapsed_s || 0}s / ${status.hold_target_s || 0}s`;
+    const remaining = Math.max(0, Math.ceil((status.hold_target_s || 0) - (status.hold_elapsed_s || 0)));
+    const countdown = document.getElementById('routine-countdown');
+    countdown.textContent = `${remaining}s remaining`;
+    countdown.className = remaining <= 5 ? 'urgent' : '';
     const pct = Math.max(0, Math.min(100, ((status.hold_elapsed_s || 0) / Math.max(status.hold_target_s || 1, 1)) * 100));
     fill.style.width = pct.toFixed(1) + '%';
+    document.getElementById('stop-routine-btn').style.display = 'block';
 
     if (lastRoutineState === 'running' && lastRoutineIndex !== null && typeof status.index === 'number' && status.index > lastRoutineIndex) {
       playRoutineBell();
