@@ -176,13 +176,6 @@
     #start-routine-btn:hover:not(:disabled) {
       background: rgba(111, 165, 111, 0.15);
     }
-    #stop-routine-btn {
-      background: transparent;
-      color: var(--danger);
-      border: 1px solid var(--danger);
-      display: none;
-    }
-    #stop-routine-btn:hover { background: rgba(217, 122, 103, 0.15); }
 
     .spinner {
       width: 16px; height: 16px;
@@ -199,7 +192,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 16px;
-      margin-top: 20px;
+      margin-top: 20px
     }
 
     .stretch-card {
@@ -338,6 +331,15 @@
 <header>
   <span class="logo">🧘</span>
   <h1>Stretch<span>AI</span></h1>
+  <button id="sound-btn" title="Enable sound" style="
+    margin-left: 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+  ">🔔 Enable sound</button>
   <div class="health-dot" id="health-dot" title="Server status"></div>
 </header>
 
@@ -374,12 +376,10 @@
       <span id="btn-text">✨ Recommend stretches</span>
     </button>
     <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
-    <button id="stop-routine-btn" onclick="stopRoutine()">⬛ Stop routine</button>
     <div id="message"></div>
     <div id="routine-panel">
       <div id="routine-title">Routine ready</div>
       <div id="routine-feedback">Keep your full body visible to begin.</div>
-      <div id="routine-countdown" style="font-size:2.2rem;font-weight:700;text-align:center;margin:10px 0;display:none;"></div>
       <div id="routine-meta"></div>
       <div id="routine-progress-wrap">
         <div id="routine-progress-fill"></div>
@@ -398,6 +398,57 @@
 <script>
   let recommendedStretches = [];
   let routinePollHandle = null;
+  let lastRoutineIndex = null;
+  let lastRoutineState = null;
+  let soundEnabled = false;
+
+  function playRoutineBell() {
+    try {
+      if (!soundEnabled) return;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      // If the context starts suspended, try to resume (still requires user gesture).
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.35, now + 0.02);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+      master.connect(ctx.destination);
+
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.connect(master);
+      osc1.start(now);
+      osc1.stop(now + 0.18);
+
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1174, now + 0.2);
+      osc2.connect(master);
+      osc2.start(now + 0.2);
+      osc2.stop(now + 0.45);
+
+      setTimeout(() => ctx.close().catch(() => {}), 700);
+    } catch (_) {
+      // Ignore audio failures (browser policy/user gesture requirements).
+    }
+  }
+
+  // ── Sound unlock ────────────────────────────────────────────────
+  function enableSound() {
+    soundEnabled = true;
+    const btn = document.getElementById('sound-btn');
+    btn.textContent = '🔔 Sound on (test)';
+    btn.style.color = 'var(--text)';
+    btn.style.borderColor = 'var(--accent)';
+    // Play once on user gesture to unlock audio.
+    playRoutineBell();
+  }
+  document.getElementById('sound-btn').addEventListener('click', enableSound);
 
   // ── Health check ────────────────────────────────────────────────
   async function checkHealth() {
@@ -434,11 +485,13 @@
       const badge = document.getElementById('posture-badge');
       document.getElementById('posture-label').textContent = result;
       badge.className = 'posture-badge ' + (POSTURE_CLASS[result] || '');
+      // update id too (kept for CSS selector)
       badge.id = 'posture-badge';
+      badge.classList.add(POSTURE_CLASS[result] || '');
     } catch { /* ignore */ }
   }
   pollPosture();
-  setInterval(pollPosture, 1500);
+  setInterval(pollPosture, 700);
 
   // ── Recommendations ─────────────────────────────────────────────
   async function getRecommendations() {
@@ -488,20 +541,11 @@
     }
   }
 
-  let thinkingTimeout = null;
   function setLoading(on) {
     const btn = document.getElementById('recommend-btn');
     btn.disabled = on;
     document.getElementById('spinner').style.display = on ? 'block' : 'none';
-    if (on) {
-      document.getElementById('btn-text').textContent = 'Thinking…';
-      thinkingTimeout = setTimeout(() => {
-        document.getElementById('btn-text').textContent = 'Still thinking…';
-      }, 4000);
-    } else {
-      clearTimeout(thinkingTimeout);
-      document.getElementById('btn-text').textContent = '✨ Recommend stretches';
-    }
+    document.getElementById('btn-text').textContent = on ? 'Thinking…' : '✨ Recommend stretches';
   }
 
   function showMessage(text, type) {
@@ -532,6 +576,8 @@
     const fill = document.getElementById('routine-progress-fill');
     fill.style.width = '0%';
     fill.className = '';
+    lastRoutineIndex = null;
+    lastRoutineState = null;
   }
 
   async function startRoutine() {
@@ -551,25 +597,11 @@
         return;
       }
       showMessage('Routine started. Hold each stretch when the form status turns correct.', 'info');
-      document.getElementById('start-routine-btn').style.display = 'none';
-      document.getElementById('stop-routine-btn').style.display = 'block';
       document.getElementById('routine-panel').style.display = 'block';
       startRoutinePolling();
     } catch (err) {
       showMessage('Could not start routine: ' + err.message, 'error');
     }
-  }
-
-  async function stopRoutine() {
-    try {
-      await fetch('/routine/stop', { method: 'POST' });
-    } catch { /* ignore */ }
-    document.getElementById('stop-routine-btn').style.display = 'none';
-    document.getElementById('start-routine-btn').style.display = 'block';
-    document.getElementById('feed-wrapper').style.boxShadow = 'none';
-    document.getElementById('routine-countdown').style.display = 'none';
-    resetRoutineUi();
-    clearMessage();
   }
 
   function startRoutinePolling() {
@@ -602,20 +634,21 @@
     }
 
     if (status.state === 'finished') {
+      if (lastRoutineState === 'running') {
+        playRoutineBell();
+      }
       panel.classList.add('finished');
-      document.getElementById('routine-title').textContent = 'Routine complete 🎉';
+      document.getElementById('routine-title').textContent = 'Routine complete';
       document.getElementById('routine-feedback').textContent = status.done_message || 'Great job completing all stretches.';
       document.getElementById('routine-meta').textContent = `${status.completed_count}/${status.total} completed`;
-      document.getElementById('routine-countdown').style.display = 'none';
       fill.style.width = '100%';
       fill.classList.add('correct');
-      document.getElementById('feed-wrapper').style.boxShadow = 'none';
-      document.getElementById('stop-routine-btn').style.display = 'none';
-      document.getElementById('start-routine-btn').style.display = 'block';
       if (routinePollHandle) {
         clearInterval(routinePollHandle);
         routinePollHandle = null;
       }
+      lastRoutineState = status.state;
+      lastRoutineIndex = status.index ?? null;
       return;
     }
 
@@ -628,18 +661,17 @@
     const pct = Math.max(0, Math.min(100, ((status.hold_elapsed_s || 0) / Math.max(status.hold_target_s || 1, 1)) * 100));
     fill.style.width = pct.toFixed(1) + '%';
 
-    // Countdown timer
-    const remaining = Math.max(0, Math.ceil((status.hold_target_s || 0) - (status.hold_elapsed_s || 0)));
-    const countdown = document.getElementById('routine-countdown');
+    if (lastRoutineState === 'running' && lastRoutineIndex !== null && typeof status.index === 'number' && status.index > lastRoutineIndex) {
+      playRoutineBell();
+    }
+    lastRoutineState = status.state;
+    lastRoutineIndex = status.index ?? null;
+
     if (status.is_correct) {
-      countdown.style.display = 'block';
-      countdown.textContent = remaining + 's';
-      countdown.style.color = 'var(--good)';
       panel.classList.add('correct');
       fill.classList.add('correct');
       document.getElementById('feed-wrapper').style.boxShadow = '0 0 0 3px rgba(141,207,141,0.7)';
     } else {
-      countdown.style.display = 'none';
       panel.classList.add('incorrect');
       document.getElementById('feed-wrapper').style.boxShadow = 'none';
     }

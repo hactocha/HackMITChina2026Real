@@ -140,3 +140,14 @@ if __name__ == "__main__":
         logger.warning("Webcam not available — video feed disabled.")
 
     app.run(debug=True, threaded=True, use_reloader=False)
+
+
+"""
+
+paste into terminal to run:
+
+cd "/Users/kwankaochuaphanich/Desktop/Home/External School Work/Everything/China HackMIT/Github/HackMITChina2026Real"
+source .venv/bin/activate
+python3 app.py
+
+"""
