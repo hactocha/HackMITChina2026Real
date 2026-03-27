@@ -103,12 +103,6 @@ def recommend_stretches(posture_label: str, pain_text: str) -> list:
 
         raw = body["message"]["content"].strip()
 
-        # Strip markdown fences if the model added them
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-
         # Extract JSON array even if there's surrounding text
         start = raw.find("[")
         end   = raw.rfind("]") + 1

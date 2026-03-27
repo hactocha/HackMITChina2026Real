@@ -447,19 +447,16 @@ def calculate_angle(a, b, c) -> float:
 def _analyse_landmarks(lm) -> str:
     global _wrist_high_frames
 
-    def pt(idx):
-        return [lm[idx].x, lm[idx].y, lm[idx].z]
-
     # 1. FORWARD HEAD
     # Lateral (side-on): noticeable drift, not a tiny camera angle
     ear_mid_x      = (lm[7].x + lm[8].x) / 2
     shoulder_mid_x = (lm[11].x + lm[12].x) / 2
-    lateral_fwd    = abs(ear_mid_x - shoulder_mid_x) > 0.15  # was 0.05
+    lateral_fwd    = abs(ear_mid_x - shoulder_mid_x) > 0.15
 
     # Depth (front-facing): ears must be clearly forward of shoulders
     ear_mid_z      = (lm[7].z + lm[8].z) / 2
     shoulder_mid_z = (lm[11].z + lm[12].z) / 2
-    depth_fwd      = (ear_mid_z - shoulder_mid_z) < -0.20    # was -0.10
+    depth_fwd      = (ear_mid_z - shoulder_mid_z) < -0.20
 
     forward_head = lateral_fwd or depth_fwd
 
@@ -468,7 +465,7 @@ def _analyse_landmarks(lm) -> str:
     shoulder_width = abs(lm[11].x - lm[12].x)
     hip_width      = abs(lm[23].x - lm[24].x)
     if hip_width > 1e-4:
-        rounded_shoulders = (shoulder_width / hip_width) < 0.70  # was 0.85
+        rounded_shoulders = (shoulder_width / hip_width) < 0.70
     else:
         rounded_shoulders = False
 
@@ -484,7 +481,7 @@ def _analyse_landmarks(lm) -> str:
                     (lm[25].y + lm[26].y) / 2,
                     (lm[25].z + lm[26].z) / 2]
     spine_angle  = calculate_angle(shoulder_mid, hip_mid, knee_mid)
-    slouching    = abs(spine_angle - 180.0) > 28.0  # was 15.0
+    slouching    = abs(spine_angle - 180.0) > 28.0
 
     # 4. WRIST STRAIN — sustained raised wrists only
     left_wrist_high  = lm[15].y < lm[13].y
