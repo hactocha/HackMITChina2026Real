@@ -198,37 +198,37 @@ STRETCH_LIBRARY = [
     },
     {
         "id": "S12",
-        "name": "Seated Forward Fold",
-        "target_muscle": "Lumbar Erectors",
+        "name": "Seated Side Stretch",
+        "target_muscle": "Latissimus Dorsi and Obliques",
         "duration_seconds": 30,
-        "posture_tags": ["lower_back", "spine"],
-        "pain_keywords": ["lower back pain", "tight back", "sitting pain"],
+        "posture_tags": ["spine", "upper_back", "shoulder"],
+        "pain_keywords": ["side tightness", "lat pain", "trunk stiffness", "rib tightness"],
         "steps": [
-            "Sit at the edge of your chair with feet hip-width apart and flat on the floor.",
-            "Lean your chest slowly forward toward your thighs and let your hands hang toward the floor.",
-            "Hold and breathe deeply for 30 seconds.",
+            "Sit tall with feet flat on the floor and both hands resting on your thighs.",
+            "Raise your right arm straight up overhead then lean your upper body gently to the left until you feel a stretch along your right side.",
+            "Hold for 15 seconds then switch arms and lean to the right for another 15 seconds.",
         ],
-        "camera_angle": "side",
-        "camera_instruction": "Sit with your side facing the camera so it can measure how far your upper body folds forward.",
+        "camera_angle": "front",
+        "camera_instruction": "Sit facing the camera so it can see your raised arm and the lateral lean of your torso.",
         "difficulty": "Easy",
-        "emoji": "🌿",
+        "emoji": "🙆",
     },
     {
         "id": "S13",
-        "name": "Cat-Cow at Chair",
-        "target_muscle": "Erector Spinae",
+        "name": "Seated Thoracic Extension",
+        "target_muscle": "Thoracic Extensors",
         "duration_seconds": 30,
-        "posture_tags": ["spine", "lower_back"],
-        "pain_keywords": ["back stiffness", "morning back pain", "posture reset"],
+        "posture_tags": ["spine", "upper_back"],
+        "pain_keywords": ["mid back stiffness", "upper back tightness", "thoracic pain", "hunching"],
         "steps": [
-            "Sit at the edge of your chair with hands on your knees and feet flat.",
-            "Arch your lower back and lift your chest toward the ceiling for the cow position then round your back toward the chair for the cat position.",
-            "Alternate slowly between the two positions for 30 seconds.",
+            "Sit tall at the edge of your chair with feet flat on the floor.",
+            "Interlace your fingers and place both hands behind your head with elbows flared wide to the sides.",
+            "Gently arch your upper back and lift your chest toward the ceiling, hold the position and breathe deeply for 30 seconds.",
         ],
-        "camera_angle": "side",
-        "camera_instruction": "Sit with your side facing the camera so it can see your spine arching and rounding clearly.",
+        "camera_angle": "front",
+        "camera_instruction": "Sit facing the camera so it can see your elbows flared wide and your chest lifting.",
         "difficulty": "Easy",
-        "emoji": "🐱",
+        "emoji": "🏹",
     },
     {
         "id": "S14",
@@ -249,18 +249,18 @@ STRETCH_LIBRARY = [
     },
     {
         "id": "S15",
-        "name": "Seated Hip Flexor Shift",
-        "target_muscle": "Hip Flexors",
-        "duration_seconds": 35,
+        "name": "Seated Hamstring Stretch",
+        "target_muscle": "Hamstrings",
+        "duration_seconds": 30,
         "posture_tags": ["lower_back", "spine"],
-        "pain_keywords": ["hip tightness", "lower back tension", "sitting soreness"],
+        "pain_keywords": ["hamstring tightness", "back of leg pain", "sitting stiffness", "tight legs"],
         "steps": [
-            "Sit at the front edge of your chair and slide your right foot back so it rests behind the chair leg.",
-            "Keep your back straight and gently press your hips forward to feel a stretch in your right hip.",
-            "Hold 35 seconds then switch legs.",
+            "Sit tall at the edge of your chair with both feet flat on the floor.",
+            "Extend your right leg straight out in front of you with your heel on the floor and toes pointing up.",
+            "Hold the position for 30 seconds then switch to the left leg.",
         ],
         "camera_angle": "side",
-        "camera_instruction": "Sit with your side facing the camera so it can confirm your back stays upright while your hip flexes.",
+        "camera_instruction": "Sit with your side facing the camera so it can see one leg extended straight and the other bent.",
         "difficulty": "Easy",
         "emoji": "🦵",
     },
@@ -353,6 +353,7 @@ STRETCH_LIBRARY = [
 
 
 def fallback_stretches() -> list:
-    """Return five safe, varied stretches when AI recommendation fails or errors."""
-    fallback_ids = {"S06", "S08", "S11", "S16", "S02"}
-    return [s for s in STRETCH_LIBRARY if s["id"] in fallback_ids]
+    """Return 5 safe general stretches used when the AI recommendation fails."""
+    fallback_ids = ["S16", "S16", "S15", "S11", "S11"]
+    by_id = {s["id"]: s for s in STRETCH_LIBRARY}
+    return [by_id[sid] for sid in fallback_ids if sid in by_id]
