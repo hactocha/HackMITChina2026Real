@@ -874,7 +874,7 @@
         <div class="session-summary-card">
           <h3 id="session-summary-heading">You completed</h3>
           <div id="session-summary-rows" class="session-summary-rows"></div>
-          <button type="button" class="session-summary-dismiss" id="session-summary-dismiss">Dismiss</button>
+          <button type="button" class="session-summary-dismiss" id="session-summary-dismiss">Back to chat</button>
         </div>
       </div>
     </div>
@@ -1538,7 +1538,9 @@
   }
   loadLibrary();
 
-  document.getElementById('session-summary-dismiss').addEventListener('click', hideSessionSummaryOverlay);
+  document.getElementById('session-summary-dismiss').addEventListener('click', () => {
+    goBackToPain();
+  });
 
   function renderTargetMuscleSummary(stretches) {
     const container = document.getElementById('target-muscle-summary');
