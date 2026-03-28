@@ -420,6 +420,57 @@
       color: var(--muted);
       margin-top: 2px;
     }
+    .session-summary-row .muscle .target-muscle-tag {
+      vertical-align: baseline;
+    }
+
+    /* Body region colours for target muscle labels */
+    .target-muscle-tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+      line-height: 1.3;
+    }
+    .body-region-neck {
+      background: #c8ebe0;
+      color: #0f3d30;
+    }
+    .body-region-shoulder {
+      background: #e3daf2;
+      color: #3d2f5c;
+    }
+    .body-region-upper_back {
+      background: #cfe8f7;
+      color: #153a52;
+    }
+    .body-region-torso {
+      background: #f5e6c8;
+      color: #5c4510;
+    }
+    .body-region-lower_back {
+      background: #f3d4c4;
+      color: #5c2e18;
+    }
+    .body-region-hip {
+      background: #edd4e8;
+      color: #4a2844;
+    }
+    .body-region-arm {
+      background: #cfe5ec;
+      color: #1e3d47;
+    }
+    .body-region-leg {
+      background: #dde8d4;
+      color: #2a4020;
+    }
+    .body-region-unknown {
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
     .session-summary-dismiss {
       width: 100%;
       margin-top: 2px;
@@ -594,10 +645,10 @@
     .stretch-card .emoji { font-size: 2rem; }
     .stretch-card .name { font-size: 1rem; font-weight: 700; }
     .stretch-card .muscle {
-      font-size: 0.78rem;
-      color: #237a5c;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      margin: 0;
+    }
+    .stretch-card .muscle .target-muscle-tag {
+      font-size: 0.76rem;
     }
     .stretch-card .duration {
       font-size: 0.82rem;
@@ -722,7 +773,14 @@
     .mini-card .emoji { font-size: 1.4rem; }
     .mini-card .info { display: flex; flex-direction: column; gap: 2px; }
     .mini-card .info .n { font-weight: 600; }
-    .mini-card .info .m { font-size: 0.76rem; color: var(--muted); }
+    .mini-card .info .m {
+      font-size: 0.76rem;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
 
     /* ── Customize routine (modal) ── */
     .customize-routine-btn {
@@ -898,7 +956,18 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      border-left-width: 4px;
+      border-left-style: solid;
     }
+    .muscle-summary-card.body-region-neck { border-left-color: #2d6a4f; }
+    .muscle-summary-card.body-region-shoulder { border-left-color: #5c4d7a; }
+    .muscle-summary-card.body-region-upper_back { border-left-color: #1d6a99; }
+    .muscle-summary-card.body-region-torso { border-left-color: #b8860b; }
+    .muscle-summary-card.body-region-lower_back { border-left-color: #ae5e41; }
+    .muscle-summary-card.body-region-hip { border-left-color: #7d4e6f; }
+    .muscle-summary-card.body-region-arm { border-left-color: #356070; }
+    .muscle-summary-card.body-region-leg { border-left-color: #4a6b3a; }
+    .muscle-summary-card.body-region-unknown { border-left-color: var(--border); }
     .muscle-summary-card .muscle-title {
       font-size: 1rem;
       font-weight: 700;
@@ -926,10 +995,9 @@
     .muscle-stretch-btn {
       width: 100%;
       display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
       text-align: left;
       cursor: pointer;
       font: inherit;
@@ -942,11 +1010,19 @@
       background: var(--surface);
       transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
+    .muscle-stretch-btn-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
     .muscle-stretch-btn:hover:not(:disabled) {
       border-color: var(--accent);
       background: var(--mint-soft);
     }
-    .muscle-stretch-btn .muscle-stretch-btn-label {
+    .muscle-stretch-btn-row .muscle-stretch-btn-label {
       flex: 1;
       min-width: 0;
     }
@@ -1194,6 +1270,17 @@
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
+  const _BODY_REGIONS = new Set(['neck', 'shoulder', 'upper_back', 'torso', 'lower_back', 'hip', 'arm', 'leg']);
+  function bodyRegionClass(region) {
+    const r = String(region || '').toLowerCase().trim();
+    return _BODY_REGIONS.has(r) ? r : 'unknown';
+  }
+  function targetMuscleTagHtml(s) {
+    const name = s && s.target_muscle != null ? String(s.target_muscle) : '—';
+    const cls = bodyRegionClass(s && s.body_region);
+    return `<span class="target-muscle-tag body-region-${cls}">${esc(name)}</span>`;
+  }
+
   function hideSessionSummaryOverlay() {
     const el = document.getElementById('session-summary-overlay');
     if (!el) return;
@@ -1225,7 +1312,7 @@
           <span class="idx">${i + 1}</span>
           <div class="row-main">
             <div class="stretch-name">${esc(s.name || id)}</div>
-            <div class="muscle">Target muscle: ${esc(s.target_muscle || '—')}</div>
+            <div class="muscle">Target muscle: ${targetMuscleTagHtml(s)}</div>
           </div>
         </div>`;
         })
@@ -1866,7 +1953,7 @@
       card.innerHTML = `
         <div class="emoji">${s.emoji || '🧘'}</div>
         <div class="name">${esc(s.name)}</div>
-        <div class="muscle">${esc(s.target_muscle)}</div>
+        <div class="muscle">${targetMuscleTagHtml(s)}</div>
         <div class="duration">⏱ ${s.duration_seconds}s</div>
         <ol>${(s.steps || []).map(st => `<li>${esc(st)}</li>`).join('')}</ol>
         <div class="camera-tip">📸 <span>${esc(s.camera_instruction || '')}</span></div>
@@ -1922,7 +2009,7 @@
           <div class="emoji">${s.emoji || '🧘'}</div>
           <div class="info">
             <div class="n">${esc(s.name)}</div>
-            <div class="m">${esc(s.target_muscle)} · ${s.duration_seconds}s</div>
+            <div class="m">${targetMuscleTagHtml(s)}<span>· ${s.duration_seconds}s</span></div>
           </div>
         `;
         grid.appendChild(card);
@@ -1961,17 +2048,18 @@
         );
         const count = sortedItems.length;
         const countLabel = count === 1 ? '1 stretch' : `${count} stretches`;
+        const cardRegion = bodyRegionClass(sortedItems[0].body_region);
         const buttons = sortedItems
           .map((s) => {
             const sel = manualRoutineOrder.includes(s.id);
             const ord = sel ? manualRoutineOrder.indexOf(s.id) + 1 : 0;
             const orderHtml = ord ? `<span class="pick-order">${ord}.</span>` : '';
-            return `<li><button type="button" class="muscle-stretch-btn${sel ? ' selected' : ''}" data-stretch-id="${esc(s.id)}" aria-pressed="${sel}"><span class="muscle-stretch-btn-label">${orderHtml}${esc(s.name)}</span><span class="muscle-stretch-meta">⏱ ${s.duration_seconds}s</span></button></li>`;
+            return `<li><button type="button" class="muscle-stretch-btn${sel ? ' selected' : ''}" data-stretch-id="${esc(s.id)}" aria-pressed="${sel}"><div class="muscle-stretch-btn-row"><span class="muscle-stretch-btn-label">${orderHtml}${esc(s.name)}</span><span class="muscle-stretch-meta">⏱ ${s.duration_seconds}s</span></div>${targetMuscleTagHtml(s)}</button></li>`;
           })
           .join('');
         return `
-          <div class="muscle-summary-card">
-            <div class="muscle-title">${esc(muscle)}</div>
+          <div class="muscle-summary-card body-region-${cardRegion}">
+            <div class="muscle-title">${targetMuscleTagHtml({ target_muscle: muscle, body_region: sortedItems[0].body_region })}</div>
             <div class="muscle-count">${esc(countLabel)}</div>
             <ul class="muscle-stretch-list">${buttons}</ul>
           </div>
