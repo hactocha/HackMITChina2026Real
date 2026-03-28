@@ -5,7 +5,7 @@ Static stretch library parsed from stretches.csv data.
 
 Exports:
   STRETCH_LIBRARY  : list of stretch dicts
-  fallback_stretches() : returns 5 safe default stretches for error handling
+  fallback_stretches() : returns five safe default stretches for error handling
 """
 
 STRETCH_LIBRARY = [
@@ -300,20 +300,20 @@ STRETCH_LIBRARY = [
     },
     {
         "id": "S18",
-        "name": "Forearm Pronation Stretch",
-        "target_muscle": "Forearm Pronators",
-        "duration_seconds": 20,
-        "posture_tags": ["forearm", "wrist"],
-        "pain_keywords": ["forearm tightness", "typing fatigue", "inner forearm pain"],
+        "name": "Seated Ankle Mobility",
+        "target_muscle": "Ankles & lower calves",
+        "duration_seconds": 25,
+        "posture_tags": ["lower_body", "circulation", "desk"],
+        "pain_keywords": ["swollen feet", "ankle stiffness", "long sitting", "leg fatigue"],
         "steps": [
-            "Hold your right arm out to the side at shoulder height with your palm facing up.",
-            "Slowly rotate your forearm so your palm faces down and hold the end position.",
-            "Continue alternating slowly for 20 seconds then repeat with the left arm.",
+            "Sit tall with feet under your knees and shoulders relaxed.",
+            "Lift one heel so the foot clears the floor slightly; slowly circle the ankle in both directions.",
+            "Place the foot down gently and repeat with the other side for the full duration.",
         ],
         "camera_angle": "front",
-        "camera_instruction": "Face the camera with your arm extended sideways so it can see the rotation of your palm clearly.",
+        "camera_instruction": "Sit facing the camera with your lower legs and feet in frame so it can see one ankle lift clearly.",
         "difficulty": "Easy",
-        "emoji": "🔃",
+        "emoji": "🦶",
     },
     {
         "id": "S19",
@@ -353,7 +353,6 @@ STRETCH_LIBRARY = [
 
 
 def fallback_stretches() -> list:
-    """Return 5 safe general stretches used when the AI recommendation fails."""
-    fallback_ids = ["S16", "S16", "S15", "S11", "S11"]
-    by_id = {s["id"]: s for s in STRETCH_LIBRARY}
-    return [by_id[sid] for sid in fallback_ids if sid in by_id]
+    """Return five safe, varied stretches when AI recommendation fails or errors."""
+    fallback_ids = {"S06", "S08", "S11", "S16", "S02"}
+    return [s for s in STRETCH_LIBRARY if s["id"] in fallback_ids]
