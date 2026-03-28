@@ -32,6 +32,37 @@ import numpy as np
 import cv2
 import mediapipe as mp
 
+import threading
+from typing import Optional
+import time
+import numpy as np
+import cv2
+import mediapipe as mp
+
+
+def _camera_device_index() -> int:
+    try:
+        return int(os.environ.get("CAMERA_INDEX", "0"))
+    except ValueError:
+        return 0
+
+
+def _video_capture(index: int = 0) -> cv2.VideoCapture:
+    """OpenCV capture with a backend that works reliably on macOS (often fixes all-black frames)."""
+    if platform.system() == "Darwin":
+        # AVFoundation avoids many cases where the default backend opens but returns black frames.
+        cap = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
+        if cap.isOpened():
+            return cap
+        cap.release()
+        return cv2.VideoCapture(index)
+    return cv2.VideoCapture(index)
+
+
+def _warmup_capture(cap: cv2.VideoCapture, n: int = 15) -> None:
+    """Discard initial frames; built-in / Continuity cameras often need a moment before valid pixels."""
+    for _ in range(n):
+        cap.read()
 # ── MediaPipe setup ───────────────────────────────────────────────────────────
 _mp_pose = mp.solutions.pose
 _mp_draw = mp.solutions.drawing_utils
@@ -47,7 +78,7 @@ _frame_lock = threading.Lock()
 _frame_event = threading.Event()   # signals that a new frame is ready
 
 # Camera thread lifecycle
-_camera_thread: threading.Thread | None = None
+_camera_thread: Optional[threading.Thread] = None
 _camera_running = False
 
 # Rolling counter: consecutive frames where a wrist is raised above its elbow
@@ -70,7 +101,7 @@ _routine_state = {
     "completed_ids": [],
     "done_message": "",
 }
-_last_routine_tick: float | None = None
+_last_routine_tick: Optional[float] = None
 
 
 def _landmark_is_visible(lm, idx: int, min_visibility: float = 0.35) -> bool:
@@ -228,31 +259,7 @@ def validate_S09(lm):
         return False, msg
     wrists_back = (lm[15].y > lm[11].y and lm[16].y > lm[12].y and abs(lm[15].x - lm[16].x) < 0.20)
     return wrists_back, "Clasp hands behind your back and lift chest gently."
-def validate_S10(lm):
-    ok, msg = _require_core_upper_body(lm)
-    if not ok:
-        return False, msg
-    
-    # Wrists clasped and below shoulders
-    wrists_together = abs(lm[15].x - lm[16].x) < 0.15
-    wrists_low = lm[15].y > lm[11].y and lm[16].y > lm[12].y
-    
-    # Wrists behind torso
-    #center_x = (lm[11].x + lm[12].x) / 2
-    #wrists_back = lm[15].x < center_x and lm[16].x < center_x
-    
-    # Arms relatively straight
-    left_straight = _angle_from_idx(lm, 11, 13, 15) > 135
-    right_straight = _angle_from_idx(lm, 12, 14, 16) > 135
-    
-    # Shoulder blades squeezed
-    shoulder_width = abs(lm[11].x - lm[12].x)
-    #elbow_width = abs(lm[13].x - lm[14].x)
-    wrist_width = abs(lm[15].x - lm[16].x)
-    squeezed = shoulder_width > wrist_width * 0.9
-    
-    valid = wrists_together and wrists_low and left_straight and right_straight and squeezed
-    return valid, "Clasp hands behind your back and lift chest gently."
+
 
 def validate_S11(lm):
     ok, msg = _require_core_full_body(lm)
