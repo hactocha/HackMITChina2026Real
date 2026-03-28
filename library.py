@@ -79,20 +79,20 @@ STRETCH_LIBRARY = [
     },
     {
         "id": "S05",
-        "name": "Head Circles",
-        "target_muscle": "Neck Extensors",
+        "name": "Sky Gazer Stretch",
+        "target_muscle": "Anterior Neck (SCM & Scalenes)",
         "duration_seconds": 20,
         "posture_tags": ["neck", "forward_head"],
         "pain_keywords": ["neck stiffness", "morning neck pain", "fatigue"],
         "steps": [
-            "Sit tall with eyes looking forward and shoulders relaxed.",
-            "Slowly lower your chin to your chest then gently roll your head in a half circle to the right and back to center.",
-            "Repeat the half circle to the left for a total of 20 seconds.",
+            "Sit tall with shoulders relaxed and hands resting on your thighs.",
+            "Slowly tilt your head back until you are looking straight up at the ceiling.",
+            "Keep your mouth closed and jaw relaxed — hold this position for 20 seconds.",
         ],
         "camera_angle": "side",
-        "camera_instruction": "Sit with your side facing the camera so it can track the arc of your head movement.",
+        "camera_instruction": "Sit with your side facing the camera so it can track the tilt of your head.",
         "difficulty": "Easy",
-        "emoji": "⭕",
+        "emoji": "🌤️",
     },
     {
         "id": "S06",
@@ -353,6 +353,7 @@ STRETCH_LIBRARY = [
 
 
 def fallback_stretches() -> list:
-    """Return five safe, varied stretches when AI recommendation fails or errors."""
-    fallback_ids = {"S06", "S08", "S11", "S16", "S02"}
-    return [s for s in STRETCH_LIBRARY if s["id"] in fallback_ids]
+    """Return 5 safe general stretches used when the AI recommendation fails."""
+    fallback_ids = ["S05", "S04", "S15", "S11", "S11"]
+    by_id = {s["id"]: s for s in STRETCH_LIBRARY}
+    return [by_id[sid] for sid in fallback_ids if sid in by_id]
