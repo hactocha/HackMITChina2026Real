@@ -354,5 +354,5 @@ STRETCH_LIBRARY = [
 
 def fallback_stretches() -> list:
     """Return 5 safe general stretches used when the AI recommendation fails."""
-    fallback_ids = {"S06", "S08", "S11", "S16", "S02"}
+    fallback_ids = {"S10", "S10", "S10", "S10", "S10"}
     return [s for s in STRETCH_LIBRARY if s["id"] in fallback_ids]
