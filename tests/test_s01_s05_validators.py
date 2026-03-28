@@ -200,43 +200,31 @@ class TestS04HeadTiltShouldersDown(unittest.TestCase):
         self.assertGreater(len(feedback), 0)
 
 
-class TestS05NeckRoll(unittest.TestCase):
+class TestS05SkyGazer(unittest.TestCase):
     """
-    S05 – Neck Roll Arc.
+    S05 – Sky Gazer Stretch.
 
-    Science: A neck roll passes through chin-to-chest (forward bow) and lateral
-    tilt. Two detectable positions are used as proxies:
-      (a) Forward bow: nose-to-shoulder y-dist < 0.12 (head bowed forward)
-      (b) Lateral position: nose x-offset from shoulder midline > 0.10
-    Threshold: condition (a) OR condition (b)
-    Before fix: < 0.35 passed trivially for every pose including neutral (dist=0.14).
-    After fix:  neutral (y-dist=0.14, x-offset=0.0) correctly fails both conditions.
+    Science: Head tilted back to look at ceiling stretches the anterior neck
+    (SCM & scalenes). Detected via nose rising above shoulder midpoint.
+      shoulder_mid_y - nose_y > 0.18
+    Neutral: shoulder_mid_y=0.36, nose_y=0.22 → dist=0.14  NOT > 0.18  ✗
+    Head back: nose_y=0.16 → dist=0.20  > 0.18  ✓
     """
 
-    def test_correct_form_forward_bow(self):
+    def test_correct_form_head_tilted_back(self):
         lm = _clone(_neutral_landmarks())
-        # Nose drops toward shoulder midpoint: y 0.22 → 0.28
-        # y-dist = |0.28 - 0.36| = 0.08  < 0.12  ✓  (chin-to-chest arc position)
-        lm[0] = _Lm(0.50, 0.28)
+        # Nose rises as head tilts back: y 0.22 → 0.16
+        # dist = 0.36 - 0.16 = 0.20  > 0.18  ✓
+        lm[0] = _Lm(0.50, 0.16)
         ok, feedback = validate_stretch_form("S05", lm)
-        self.assertTrue(ok, f"Forward bow should pass S05; got: {feedback!r}")
-        self.assertGreater(len(feedback), 0)
-
-    def test_correct_form_lateral_tilt(self):
-        lm = _clone(_neutral_landmarks())
-        # Nose shifts to the side during the arc: x-offset = 0.11  > 0.10  ✓
-        lm[0] = _Lm(0.39, 0.22)
-        ok, feedback = validate_stretch_form("S05", lm)
-        self.assertTrue(ok, f"Lateral tilt should pass S05; got: {feedback!r}")
+        self.assertTrue(ok, f"Head tilted back should pass S05; got: {feedback!r}")
         self.assertGreater(len(feedback), 0)
 
     def test_incorrect_form_neutral(self):
         lm = _neutral_landmarks()
-        # y-dist = 0.14  NOT < 0.12
-        # x-offset = 0.0  NOT > 0.10
-        # Both conditions fail ✗
+        # dist = 0.36 - 0.22 = 0.14  NOT > 0.18  ✗
         ok, feedback = validate_stretch_form("S05", lm)
-        self.assertFalse(ok, "Neutral pose should NOT pass as S05 (was broken before fix).")
+        self.assertFalse(ok, "Neutral pose should NOT pass S05.")
         self.assertGreater(len(feedback), 0)
 
 

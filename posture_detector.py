@@ -206,15 +206,23 @@ def validate_S04(lm):
     good = min(ear_l_sh, ear_r_sh) < 0.18 and shoulder_delta < 0.30 and ((_angle_from_idx(lm, 14, 12, 11) > 75 and _angle_from_idx(lm, 14, 12, 11) < 105) or (_angle_from_idx(lm, 12, 11, 13) > 75 and _angle_from_idx(lm, 12, 11, 13) < 105))
     return good, "Tilt your head to one side and keep shoulders down."
 
-#inv
 def validate_S05(lm):
-    ok, msg = _require_core_upper_body(lm)
-    if not ok:
-        return False, msg
-    shoulder_mid_x = (lm[11].x + lm[12].x) / 2.0
+    # Require shoulders/arms but NOT the nose — when the head tilts far back,
+    # the nose leaves the frame. That itself is a sign of deep correct form.
+    shoulders_ok = all(_landmark_is_visible(lm, idx) for idx in [11, 12, 13, 14])
+    if not shoulders_ok:
+        return False, "Move fully into frame so shoulders and arms are visible."
+
+    # If nose is invisible but shoulders are present, the head is tilted far
+    # back enough that MediaPipe lost it — accept as correct form.
+    if not _landmark_is_visible(lm, 0):
+        return True, "Tilt your head back and look up at the ceiling."
+
     shoulder_mid_y = (lm[11].y + lm[12].y) / 2.0
-    neck_bent = (abs(lm[0].y - shoulder_mid_y) < 0.12) or (abs(lm[0].x - shoulder_mid_x) > 0.10)
-    return neck_bent, "Move through a gentle head arc with chin lowered slightly."
+    head_back = (shoulder_mid_y - lm[0].y) > 0.25
+    nose_higher_than_ears = lm[0].y < ((lm[8].y + lm[7].y) / 2.0) + 0.02
+    correct = nose_higher_than_ears and head_back
+    return correct, "Tilt your head back and look up at the ceiling."
 
 
 def validate_S06(lm):

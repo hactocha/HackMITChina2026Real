@@ -542,6 +542,10 @@
     #stop-routine-btn:hover:not(:disabled) {
       background: rgba(185, 28, 28, 0.14);
     }
+    #dev-fallback-btn {
+      opacity: 0.5;
+      font-size: 0.75em;
+    }
     #thinking-hint {
       display: none;
       font-size: 0.82rem;
@@ -1086,6 +1090,7 @@
     </div>
     <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
     <button id="stop-routine-btn" onclick="stopRoutine()">■ Stop routine</button>
+    <button id="dev-fallback-btn" onclick="devStartFallback()">⚙ Dev: load fallback</button>
     <div id="routine-panel">
       <div id="routine-title">Routine ready</div>
       <div id="routine-feedback">Keep your full body visible to begin.</div>
@@ -1864,6 +1869,22 @@
   document.getElementById('session-summary-dismiss').addEventListener('click', () => {
     goBackToPain();
   });
+
+  // ── Dev shortcut: skip chat and go straight to fallback stretches ──
+  async function devStartFallback() {
+    try {
+      const r = await fetch('/fallback');
+      const data = await r.json();
+      const stretches = data.stretches || [];
+      if (!stretches.length) return;
+      recommendedStretches = stretches;
+      renderStretches(stretches);
+      setSessionStage(true);
+      await startRoutine();
+    } catch (err) {
+      showMessage('Dev fallback failed: ' + err.message, 'error');
+    }
+  }
 
   function renderTargetMuscleSummary(stretches) {
     const container = document.getElementById('target-muscle-summary');

@@ -74,21 +74,21 @@
   },
   {
     "id": "S05",
-    "name": "Head Circles",
-    "target_muscle": "Neck Extensors",
+    "name": "Sky Gazer Stretch",
+    "target_muscle": "Anterior Neck (SCM & Scalenes)",
     "duration_seconds": 20,
     "posture_tags": ["neck", "forward_head"],
     "pain_keywords": ["neck stiffness", "morning neck pain", "fatigue"],
     "steps": [
-      "Sit tall with eyes looking forward and shoulders relaxed.",
-      "Slowly lower your chin to your chest then gently roll your head in a half circle to the right and back to center.",
-      "Repeat the half circle to the left for a total of 20 seconds."
+      "Sit tall with shoulders relaxed and hands resting on your thighs.",
+      "Slowly tilt your head back until you are looking straight up at the ceiling.",
+      "Keep your mouth closed and jaw relaxed — hold this position for 20 seconds."
     ],
     "camera_angle": "side",
-    "camera_instruction": "Sit with your side facing the camera so it can track the arc of your head movement.",
+    "camera_instruction": "Sit with your side facing the camera so it can track the tilt of your head.",
     "difficulty": "Easy",
-    "emoji": "⭕",
-    "gif_url": "https://spotebi.com/wp-content/uploads/2015/03/neck-rolls-exercise-illustration.gif"
+    "emoji": "🌤️",
+    "gif_url": ""
   },
   {
     "id": "S06",
