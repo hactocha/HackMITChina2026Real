@@ -382,9 +382,21 @@
     .mini-card .info { display: flex; flex-direction: column; gap: 2px; }
     .mini-card .info .n { font-weight: 600; }
     .mini-card .info .m { font-size: 0.76rem; color: var(--muted); }
+
+    .music-credit {
+      padding: 0 32px 24px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.45;
+      max-width: 720px;
+    }
+    .music-credit a { color: var(--accent); }
   </style>
 </head>
 <body>
+
+<!-- Calming hold music: use Pixabay "Calming Piano Tune" (Universfield) — https://pixabay.com/music/modern-classical-calming-piano-tune-232562/ — replace static/music/calming-piano-tune.mp3 after download if you want the exact track. -->
+<audio id="correct-hold-music" loop playsinline preload="metadata" src="/static/music/calming-piano-tune.mp3"></audio>
 
 <header>
   <span class="logo">🧘</span>
@@ -460,6 +472,12 @@
   <div id="all-grid"></div>
 </section>
 
+<p class="music-credit">
+  Hold music (while form is correct) is a gentle piano bed so the stretch timer feels musical.
+  Bundled clip: <a href="https://freesound.org/people/kjartan_abel/sounds/532774/" target="_blank" rel="noopener noreferrer">kjartan_abel on Freesound</a>
+  (CC BY 4.0). For Pixabay’s <a href="https://pixabay.com/music/modern-classical-calming-piano-tune-232562/" target="_blank" rel="noopener noreferrer">Calming Piano Tune</a>, download the MP3 and replace <code>static/music/calming-piano-tune.mp3</code> (same filename).
+</p>
+
 <script>
   let recommendedStretches = [];
   let routinePollHandle = null;
@@ -468,6 +486,10 @@
   const _removedCardIds = new Set();
   let soundEnabled = false;
   let stillThinkingTimeout = null;
+
+  function getCorrectHoldMusicEl() {
+    return document.getElementById('correct-hold-music');
+  }
 
   function playRoutineBell() {
     try {
@@ -505,6 +527,31 @@
     }
   }
 
+  /** Looping calming piano while hold form is correct. */
+  function startCorrectHoldMusic() {
+    if (!soundEnabled) return;
+    const el = getCorrectHoldMusicEl();
+    if (!el) return;
+    el.volume = 0.38;
+    el.play().catch(() => {});
+  }
+
+  function stopCorrectHoldMusic() {
+    const el = getCorrectHoldMusicEl();
+    if (!el) return;
+    el.pause();
+    try {
+      el.currentTime = 0;
+    } catch (_) {}
+  }
+
+  /** Pause without rewinding (slip out of form briefly). */
+  function pauseCorrectHoldMusic() {
+    const el = getCorrectHoldMusicEl();
+    if (!el) return;
+    el.pause();
+  }
+
   // ── Sound unlock ────────────────────────────────────────────────
   function enableSound() {
     soundEnabled = true;
@@ -512,7 +559,9 @@
     btn.textContent = '🔔 Sound on (test)';
     btn.style.color = 'var(--text)';
     btn.style.borderColor = 'var(--accent)';
-    // Play once on user gesture to unlock audio.
+    // Unlock <audio> + WebAudio bells with user gesture.
+    const hold = getCorrectHoldMusicEl();
+    if (hold) hold.load();
     playRoutineBell();
   }
   document.getElementById('sound-btn').addEventListener('click', enableSound);
@@ -661,6 +710,7 @@
     document.getElementById('stop-routine-btn').style.display = 'none';
     lastRoutineIndex = null;
     lastRoutineState = null;
+    stopCorrectHoldMusic();
   }
 
   async function startRoutine() {
@@ -733,10 +783,12 @@
       fill.style.width = '0%';
       document.getElementById('stop-routine-btn').style.display = 'none';
       document.getElementById('stretch-image-box').style.display = 'none';
+      stopCorrectHoldMusic();
       return;
     }
 
     if (status.state === 'finished') {
+      stopCorrectHoldMusic();
       if (lastRoutineState === 'running') {
         playRoutineBell();
       }
@@ -794,9 +846,18 @@
 
     if (lastRoutineState === 'running' && lastRoutineIndex !== null && typeof status.index === 'number' && status.index > lastRoutineIndex) {
       playRoutineBell();
+      const hm = getCorrectHoldMusicEl();
+      if (hm) hm.currentTime = 0;
     }
     lastRoutineState = status.state;
     lastRoutineIndex = status.index ?? null;
+
+    const shouldHoldMusic = soundEnabled && status.state === 'running' && status.is_correct;
+    if (shouldHoldMusic) {
+      startCorrectHoldMusic();
+    } else {
+      pauseCorrectHoldMusic();
+    }
 
     if (status.is_correct) {
       panel.classList.add('correct');
