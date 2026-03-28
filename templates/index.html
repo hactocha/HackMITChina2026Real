@@ -383,6 +383,70 @@
     .mini-card .info .n { font-weight: 600; }
     .mini-card .info .m { font-size: 0.76rem; color: var(--muted); }
 
+    /* ── Target muscle summary ── */
+    #target-muscle-section {
+      padding: 0 32px 40px;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 28px;
+    }
+    #target-muscle-section h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    #target-muscle-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .muscle-summary-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .muscle-summary-card .muscle-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .muscle-summary-card .muscle-count {
+      font-size: 0.78rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .muscle-summary-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .muscle-summary-card ul li {
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding-left: 14px;
+      position: relative;
+      line-height: 1.4;
+    }
+    .muscle-summary-card ul li::before {
+      content: '·';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
     .music-credit {
       padding: 0 32px 24px;
       font-size: 0.72rem;
@@ -470,6 +534,14 @@
 <section id="all-stretches-section">
   <h2>Full Stretch Library</h2>
   <div id="all-grid"></div>
+</section>
+
+<section id="target-muscle-section" aria-labelledby="target-muscle-heading">
+  <h2 id="target-muscle-heading">Target muscle summary</h2>
+  <p style="font-size:0.88rem;color:var(--muted);margin:-8px 0 16px;max-width:52ch">
+    Stretches in the library grouped by primary target muscle.
+  </p>
+  <div id="target-muscle-summary"></div>
 </section>
 
 <p class="music-credit">
@@ -919,9 +991,43 @@
         `;
         grid.appendChild(card);
       });
+      renderTargetMuscleSummary(stretches);
     } catch { /* ignore */ }
   }
   loadLibrary();
+
+  function renderTargetMuscleSummary(stretches) {
+    const container = document.getElementById('target-muscle-summary');
+    if (!container || !Array.isArray(stretches) || !stretches.length) {
+      if (container) container.innerHTML = '';
+      return;
+    }
+    const byMuscle = new Map();
+    for (const s of stretches) {
+      const m = String(s.target_muscle || 'Unknown').trim() || 'Unknown';
+      if (!byMuscle.has(m)) byMuscle.set(m, []);
+      byMuscle.get(m).push(s.name);
+    }
+    const sorted = [...byMuscle.entries()].sort((a, b) =>
+      a[0].localeCompare(b[0], undefined, { sensitivity: 'base' })
+    );
+    container.innerHTML = sorted
+      .map(([muscle, names]) => {
+        const uniqueNames = [...new Set(names.map(n => String(n).trim()).filter(Boolean))].sort((a, b) =>
+          a.localeCompare(b, undefined, { sensitivity: 'base' })
+        );
+        const count = uniqueNames.length;
+        const countLabel = count === 1 ? '1 stretch' : `${count} stretches`;
+        return `
+          <div class="muscle-summary-card">
+            <div class="muscle-title">${esc(muscle)}</div>
+            <div class="muscle-count">${esc(countLabel)}</div>
+            <ul>${uniqueNames.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+          </div>
+        `;
+      })
+      .join('');
+  }
 
   // ── Utility ──────────────────────────────────────────────────────
   function esc(str) {
