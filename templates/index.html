@@ -452,6 +452,17 @@
     #posture-badge.good   { border-color: var(--good);   color: var(--good); }
     #posture-badge.warn   { border-color: var(--warn);   color: var(--warn); }
     #posture-badge.danger { border-color: var(--danger); color: var(--danger); }
+    #current-stretch-text {
+      display: none;
+      margin-top: 14px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--mint-soft);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
     /* ── Stretch image below camera ── */
     #stretch-image-box {
       display: none;
@@ -469,14 +480,6 @@
       object-fit: contain;
       background: #f0f4f2;
     }
-    #stretch-image-label {
-      padding: 8px 12px;
-      font-size: 0.8rem;
-      color: var(--muted);
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-    }
-
     #posture-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
@@ -541,10 +544,6 @@
     }
     #stop-routine-btn:hover:not(:disabled) {
       background: rgba(185, 28, 28, 0.14);
-    }
-    #dev-fallback-btn {
-      opacity: 0.5;
-      font-size: 0.75em;
     }
     #thinking-hint {
       display: none;
@@ -1069,16 +1068,16 @@
         </div>
       </div>
     </div>
+    <div id="stretch-image-box">
+      <img id="stretch-image" src="" alt="Stretch demonstration" referrerpolicy="no-referrer" />
+    </div>
+    <div id="current-stretch-text"></div>
     <button type="button" class="customize-routine-btn" id="customize-routine-btn">
       Customize routine
     </button>
     <div id="posture-badge">
       <div id="posture-dot"></div>
       <span id="posture-label">Detecting…</span>
-    </div>
-    <div id="stretch-image-box">
-      <img id="stretch-image" src="" alt="Stretch demonstration" />
-      <div id="stretch-image-label"></div>
     </div>
   </div>
 
@@ -1090,7 +1089,6 @@
     </div>
     <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
     <button id="stop-routine-btn" onclick="stopRoutine()">■ Stop routine</button>
-    <button id="dev-fallback-btn" onclick="devStartFallback()">⚙ Dev: load fallback</button>
     <div id="routine-panel">
       <div id="routine-title">Routine ready</div>
       <div id="routine-feedback">Keep your full body visible to begin.</div>
@@ -1162,6 +1160,38 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function toProxyImageUrl(rawUrl) {
+    if (!rawUrl) return '';
+    const u = String(rawUrl).trim();
+    if (!u) return '';
+    if (u.startsWith('/')) return u;
+    return '/image-proxy?url=' + encodeURIComponent(u);
+  }
+
+  function normalizeImageUrl(rawUrl) {
+    if (!rawUrl) return '';
+    const u = String(rawUrl).trim();
+    if (!u) return '';
+    return u;
+  }
+
+  function localStretchPlaceholder(stretchId) {
+    if (!stretchId) return '';
+    return '/static/stretches/' + encodeURIComponent(String(stretchId)) + '.svg';
+  }
+
+  function generatedStretchPlaceholder(stretchId, stretchName) {
+    const id = String(stretchId || '').trim() || 'Stretch';
+    const name = String(stretchName || '').trim() || id;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+      <rect width="960" height="540" fill="#f5fbf8"/>
+      <rect x="24" y="24" width="912" height="492" rx="16" fill="#ffffff" stroke="#9bd8bf" stroke-width="3"/>
+      <text x="480" y="210" text-anchor="middle" fill="#1e4d3a" font-family="Segoe UI,Arial,sans-serif" font-size="56" font-weight="700">${id}</text>
+      <text x="480" y="290" text-anchor="middle" fill="#4f6f62" font-family="Segoe UI,Arial,sans-serif" font-size="34">${name}</text>
+    </svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
   function hideSessionSummaryOverlay() {
@@ -1692,6 +1722,7 @@
       fill.style.width = '0%';
       document.getElementById('stop-routine-btn').style.display = 'none';
       document.getElementById('stretch-image-box').style.display = 'none';
+      document.getElementById('current-stretch-text').style.display = 'none';
       stopCorrectHoldMusic();
       return;
     }
@@ -1713,6 +1744,7 @@
       syncStartRoutineButton();
       document.getElementById('stop-routine-btn').style.display = 'none';
       document.getElementById('stretch-image-box').style.display = 'none';
+      document.getElementById('current-stretch-text').style.display = 'none';
       if (routinePollHandle) {
         clearInterval(routinePollHandle);
         routinePollHandle = null;
@@ -1726,19 +1758,53 @@
     hideSessionSummaryOverlay();
     const cur = status.current_stretch || {};
 
-    // Show stretch image (gif preferred, fallback to image_url)
-    const imgUrl = cur.gif_url || cur.image_url || '';
+    // Show stretch image for current stretch from JSON media URLs.
+    const directPrimaryUrl = normalizeImageUrl(cur.gif_url || cur.image_url || '');
+    const directSecondaryUrl = normalizeImageUrl(cur.image_url || cur.gif_url || '');
+    const proxiedPrimaryUrl = toProxyImageUrl(cur.gif_url || cur.image_url || '');
+    const proxiedSecondaryUrl = toProxyImageUrl(cur.image_url || cur.gif_url || '');
+    const fallbackUrl = localStretchPlaceholder(cur.id);
+    const generatedUrl = generatedStretchPlaceholder(cur.id, cur.name);
     const imgBox = document.getElementById('stretch-image-box');
     const imgEl = document.getElementById('stretch-image');
-    const imgLabel = document.getElementById('stretch-image-label');
-    if (imgUrl) {
-      if (imgEl.getAttribute('src') !== imgUrl) {
-        imgEl.src = imgUrl;
-        imgLabel.textContent = cur.name || '';
+    const stretchTextEl = document.getElementById('current-stretch-text');
+    const candidates = Array.from(
+      new Set([
+        directPrimaryUrl,
+        directSecondaryUrl,
+        proxiedPrimaryUrl,
+        proxiedSecondaryUrl,
+        fallbackUrl,
+        generatedUrl,
+      ].filter(Boolean))
+    );
+    if (candidates.length) {
+      const curId = String(cur.id || '');
+      stretchTextEl.textContent = cur.name || cur.id || 'Current stretch';
+      stretchTextEl.style.display = 'block';
+      if (imgEl.getAttribute('data-stretch-id') !== curId) {
+        imgEl.setAttribute('data-stretch-id', curId);
+        const tryLoad = (idx) => {
+          if (idx >= candidates.length) {
+            imgBox.style.display = 'none';
+            return;
+          }
+          imgEl.onerror = () => tryLoad(idx + 1);
+          imgEl.onload = () => {
+            imgEl.onerror = null;
+            imgEl.onload = null;
+            imgBox.style.display = 'block';
+          };
+          imgEl.src = candidates[idx];
+        };
+        tryLoad(0);
+      } else {
+        imgBox.style.display = 'block';
       }
       imgBox.style.display = 'block';
     } else {
       imgBox.style.display = 'none';
+      stretchTextEl.style.display = 'none';
     }
     document.getElementById('routine-title').textContent =
       `Now: ${cur.name || 'Stretch'} (${(status.index || 0) + 1}/${status.total || 5})`;
@@ -1869,22 +1935,6 @@
   document.getElementById('session-summary-dismiss').addEventListener('click', () => {
     goBackToPain();
   });
-
-  // ── Dev shortcut: skip chat and go straight to fallback stretches ──
-  async function devStartFallback() {
-    try {
-      const r = await fetch('/fallback');
-      const data = await r.json();
-      const stretches = data.stretches || [];
-      if (!stretches.length) return;
-      recommendedStretches = stretches;
-      renderStretches(stretches);
-      setSessionStage(true);
-      await startRoutine();
-    } catch (err) {
-      showMessage('Dev fallback failed: ' + err.message, 'error');
-    }
-  }
 
   function renderTargetMuscleSummary(stretches) {
     const container = document.getElementById('target-muscle-summary');
