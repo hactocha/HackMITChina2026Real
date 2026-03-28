@@ -3,27 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StretchAI</title>
+  <title>Professor Jamie</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #101a14;
-      --surface: #18261d;
-      --card: #213125;
-      --accent: #6fa56f;
-      --accent-hover: #84b784;
-      --good: #8dcf8d;
-      --warn: #d1b66a;
-      --danger: #d97a67;
-      --text: #e8f1e8;
-      --muted: #b2c5b2;
-      --border: #314736;
+      /* Brand: white + mint #AAE8D2 */
+      --mint: #AAE8D2;
+      --mint-hover: #95dfc4;
+      --mint-soft: #e8f7f0;
+      --mint-muted: #c5ecdd;
+      --bg: #ffffff;
+      --surface: #f5fbf8;
+      --card: #ffffff;
+      --accent: #1e4d3a;
+      --accent-hover: #2a6b52;
+      --good: #1b7f5a;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --text: #14221a;
+      --muted: #4f6f62;
+      --border: #9bd8bf;
       --radius: 14px;
     }
 
     body {
-      background: var(--bg);
+      background: linear-gradient(180deg, var(--mint-soft) 0%, var(--bg) 22%, var(--bg) 100%);
       color: var(--text);
       font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
@@ -37,8 +42,9 @@
       align-items: center;
       gap: 12px;
       padding: 18px 32px;
-      background: var(--surface);
+      background: linear-gradient(90deg, var(--mint) 0%, var(--mint-soft) 55%, #ffffff 100%);
       border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
     }
     header .logo { font-size: 1.6rem; }
     header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.3px; }
@@ -48,9 +54,218 @@
       width: 10px; height: 10px;
       border-radius: 50%;
       background: var(--good);
-      box-shadow: 0 0 6px var(--good);
+      box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(27, 127, 90, 0.45);
     }
-    .health-dot.offline { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+    .health-dot.offline { background: var(--danger); box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(185, 28, 28, 0.4); }
+
+    /* ── Stages (pain first → then session) ── */
+    .stage { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .stage.hidden { display: none !important; }
+
+    #stage-pain {
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px 28px;
+      flex: 1;
+    }
+
+    /* ── Professor Jamie chat (first screen) ── */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .chat-shell {
+      width: 100%;
+      max-width: 420px;
+      min-height: min(76vh, 640px);
+      max-height: calc(100vh - 120px);
+      background: var(--mint);
+      border-radius: 25px;
+      box-shadow:
+        0 4px 24px rgba(30, 77, 58, 0.12),
+        0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-chrome {
+      padding: 18px 20px 12px;
+      flex-shrink: 0;
+    }
+    .chat-brand {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+      opacity: 0.85;
+      margin-bottom: 12px;
+    }
+    .chat-progress {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+    }
+    .chat-progress-fill {
+      height: 100%;
+      width: 50%;
+      border-radius: 999px;
+      background: #4a8ccb;
+      transition: width 0.3s ease;
+    }
+
+    .chat-thread {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .chat-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      max-width: 100%;
+    }
+    .chat-row-bot { flex-direction: row; justify-content: flex-start; }
+    .chat-row-user {
+      flex-direction: row-reverse;
+      justify-content: flex-start;
+      align-self: flex-end;
+    }
+
+    .chat-avatar {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(30, 77, 58, 0.12);
+    }
+    .chat-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .chat-avatar-user {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      background: transparent;
+      display: block;
+    }
+    .chat-avatar-user img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 50%;
+    }
+
+    .chat-bubble {
+      max-width: 82%;
+      padding: 14px 16px;
+      border-radius: 20px;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      box-shadow: 0 2px 10px rgba(30, 77, 58, 0.08);
+    }
+    .chat-bubble-bot {
+      background: #fff;
+      color: var(--text);
+      border-bottom-left-radius: 6px;
+    }
+    .chat-bubble-user {
+      background: #fff;
+      color: var(--text);
+      border-bottom-right-radius: 6px;
+    }
+
+    .chat-composer {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 14px 16px 18px;
+      background: rgba(255, 255, 255, 0.22);
+      flex-shrink: 0;
+    }
+    #pain-input.chat-composer-field {
+      flex: 1;
+      min-height: 48px;
+      max-height: 120px;
+      resize: none;
+      border: none;
+      border-radius: 999px;
+      padding: 14px 20px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--text);
+      background: #fff;
+      box-shadow: 0 2px 12px rgba(30, 77, 58, 0.08);
+      outline: none;
+      line-height: 1.35;
+    }
+    #pain-input.chat-composer-field:focus {
+      box-shadow: 0 2px 12px rgba(30, 77, 58, 0.08), 0 0 0 2px var(--accent);
+    }
+    #pain-input.chat-composer-field::placeholder {
+      color: #7a9085;
+    }
+
+    #recommend-btn.chat-send {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+      padding: 0;
+      border-radius: 50%;
+      background: #fff;
+      color: var(--accent);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 2px 10px rgba(30, 77, 58, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    #recommend-btn.chat-send:hover:not(:disabled) {
+      background: var(--mint-soft);
+      border-color: var(--border);
+    }
+    #recommend-btn.chat-send .spinner {
+      position: absolute;
+    }
+    #recommend-btn.chat-send:disabled {
+      opacity: 0.75;
+    }
+    .chat-send-arrow {
+      font-size: 1.25rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    #thinking-hint.chat-hint {
+      text-align: center;
+      padding: 0 20px 14px;
+      margin-top: -6px;
+      font-size: 0.8rem;
+      color: var(--accent);
+      opacity: 0.9;
+    }
 
     /* ── Main layout ── */
     main {
@@ -64,12 +279,37 @@
       main { grid-template-columns: 1fr; }
     }
 
+    .session-panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .session-panel-head h2 { margin-bottom: 0; }
+    #back-pain-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    #back-pain-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(170, 232, 210, 0.35);
+    }
+
     /* ── Cards ── */
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 22px;
+      box-shadow: 0 2px 12px rgba(30, 77, 58, 0.06);
     }
     .card h2 {
       font-size: 0.85rem;
@@ -83,10 +323,11 @@
     /* ── Webcam feed ── */
     .feed-wrapper {
       position: relative;
-      background: #000;
+      background: #0f1a15;
       border-radius: 10px;
       overflow: hidden;
       aspect-ratio: 4/3;
+      border: 2px solid var(--border);
     }
     .feed-wrapper img {
       width: 100%;
@@ -128,7 +369,7 @@
       border-radius: 10px;
       overflow: hidden;
       border: 1px solid var(--border);
-      background: #000;
+      background: var(--surface);
     }
     #stretch-image-box img {
       width: 100%;
@@ -136,7 +377,7 @@
       display: block;
       max-height: 260px;
       object-fit: contain;
-      background: #111;
+      background: #f0f4f2;
     }
     #stretch-image-label {
       padding: 8px 12px;
@@ -183,14 +424,15 @@
     button:active { transform: scale(0.98); }
 
     #recommend-btn {
-      background: var(--accent);
-      color: #fff;
+      background: var(--mint);
+      color: var(--accent);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
+      border: 1px solid var(--border);
     }
-    #recommend-btn:hover:not(:disabled) { background: var(--accent-hover); }
+    #recommend-btn:hover:not(:disabled) { background: var(--mint-hover); }
     #recommend-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     #start-routine-btn {
       background: transparent;
@@ -199,16 +441,16 @@
       display: none;
     }
     #start-routine-btn:hover:not(:disabled) {
-      background: rgba(111, 165, 111, 0.15);
+      background: rgba(170, 232, 210, 0.4);
     }
     #stop-routine-btn {
-      background: rgba(217, 122, 103, 0.15);
+      background: rgba(185, 28, 28, 0.08);
       color: var(--danger);
-      border: 1px solid var(--danger);
+      border: 1px solid rgba(185, 28, 28, 0.45);
       display: none;
     }
     #stop-routine-btn:hover:not(:disabled) {
-      background: rgba(217, 122, 103, 0.25);
+      background: rgba(185, 28, 28, 0.14);
     }
     #thinking-hint {
       display: none;
@@ -219,8 +461,8 @@
 
     .spinner {
       width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
+      border: 2px solid rgba(30, 77, 58, 0.2);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       display: none;
@@ -236,7 +478,7 @@
     }
 
     .stretch-card {
-      background: var(--surface);
+      background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 18px;
@@ -260,7 +502,7 @@
     .stretch-card .name { font-size: 1rem; font-weight: 700; }
     .stretch-card .muscle {
       font-size: 0.78rem;
-      color: var(--accent);
+      color: #237a5c;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -278,7 +520,7 @@
     .stretch-card .camera-tip {
       font-size: 0.78rem;
       color: var(--muted);
-      background: var(--card);
+      background: var(--mint-soft);
       border-radius: 7px;
       padding: 7px 10px;
       display: flex;
@@ -294,8 +536,14 @@
       font-size: 0.88rem;
       display: none;
     }
-    #message.error { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
-    #message.info  { background: rgba(108,99,255,0.15); color: var(--accent); border: 1px solid rgba(108,99,255,0.3); }
+    #message.error { background: rgba(185, 28, 28, 0.08); color: #991b1b; border: 1px solid rgba(185, 28, 28, 0.35); }
+    #message.info  { background: var(--mint-soft); color: var(--accent); border: 1px solid var(--border); }
+
+    /* Global flash message below header */
+    #message.global-msg {
+      margin: 0 32px 0;
+      margin-top: 12px;
+    }
 
     #routine-panel {
       display: none;
@@ -369,7 +617,7 @@
       gap: 12px;
     }
     .mini-card {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 12px 14px;
@@ -391,6 +639,22 @@
       max-width: 720px;
     }
     .music-credit a { color: var(--accent); }
+
+    .sound-btn {
+      margin-left: 12px;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .sound-btn:hover {
+      background: #ffffff;
+      color: var(--text);
+      border-color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -400,19 +664,47 @@
 
 <header>
   <span class="logo">🧘</span>
-  <h1>Stretch<span>AI</span></h1>
-  <button id="sound-btn" title="Enable sound" style="
-    margin-left: 12px;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 8px 10px;
-    border-radius: 10px;
-    font-size: 0.85rem;
-  ">🔔 Enable sound</button>
+  <h1>Professor <span>Jamie</span></h1>
+  <button type="button" id="sound-btn" class="sound-btn" title="Enable sound">🔔 Enable sound</button>
   <div class="health-dot" id="health-dot" title="Server status"></div>
 </header>
 
+<div id="message" class="global-msg"></div>
+
+<div id="stage-pain" class="stage">
+  <div class="chat-shell">
+    <div class="chat-chrome">
+      <span class="chat-brand">Professor Jamie</span>
+      <div class="chat-progress" aria-hidden="true">
+        <div class="chat-progress-fill" id="chat-progress-fill"></div>
+      </div>
+    </div>
+    <div class="chat-thread" id="pain-chat-thread">
+      <div class="chat-row chat-row-bot">
+        <div class="chat-avatar chat-avatar-bot" aria-hidden="true">
+          <img src="/static/professor-jamie.png" width="44" height="44" alt="Professor Jamie" />
+        </div>
+        <div class="chat-bubble chat-bubble-bot">Where is your pain?</div>
+      </div>
+    </div>
+    <div class="chat-composer">
+      <label class="sr-only" for="pain-input">Describe your pain</label>
+      <textarea
+        id="pain-input"
+        class="chat-composer-field"
+        rows="1"
+        placeholder="Type your answer…"
+      ></textarea>
+      <button type="button" class="chat-send" id="recommend-btn" onclick="getRecommendations()" aria-label="Send answer">
+        <span class="spinner" id="spinner"></span>
+        <span id="btn-text" class="chat-send-arrow" aria-hidden="true">↑</span>
+      </button>
+    </div>
+    <div id="thinking-hint" class="chat-hint">Still thinking… this can take a few seconds.</div>
+  </div>
+</div>
+
+<div id="stage-session" class="stage hidden">
 <main>
   <!-- Left: webcam + posture -->
   <div class="card">
@@ -435,24 +727,14 @@
     </div>
   </div>
 
-  <!-- Right: recommend panel -->
+  <!-- Right: routine + stretch list -->
   <div class="card pain-panel">
-    <h2>Get Stretch Recommendations</h2>
-    <label for="pain-input" style="font-size:0.9rem;color:var(--muted)">
-      Describe where it hurts or feels tight:
-    </label>
-    <textarea
-      id="pain-input"
-      placeholder="e.g. my lower back is stiff and my neck aches from looking at screens all day…"
-    ></textarea>
-    <button id="recommend-btn" onclick="getRecommendations()">
-      <div class="spinner" id="spinner"></div>
-      <span id="btn-text">✨ Recommend stretches</span>
-    </button>
-    <div id="thinking-hint">Still thinking... Ollama can take a few extra seconds.</div>
+    <div class="session-panel-head">
+      <h2>Your stretches</h2>
+      <button type="button" id="back-pain-btn">← Edit description</button>
+    </div>
     <button id="start-routine-btn" onclick="startRoutine()">▶ Start stretch routine</button>
     <button id="stop-routine-btn" onclick="stopRoutine()">■ Stop routine</button>
-    <div id="message"></div>
     <div id="routine-panel">
       <div id="routine-title">Routine ready</div>
       <div id="routine-feedback">Keep your full body visible to begin.</div>
@@ -477,6 +759,7 @@
   Bundled clip: <a href="https://freesound.org/people/kjartan_abel/sounds/532774/" target="_blank" rel="noopener noreferrer">kjartan_abel on Freesound</a>
   (CC BY 4.0). For Pixabay’s <a href="https://pixabay.com/music/modern-classical-calming-piano-tune-232562/" target="_blank" rel="noopener noreferrer">Calming Piano Tune</a>, download the MP3 and replace <code>static/music/calming-piano-tune.mp3</code> (same filename).
 </p>
+</div>
 
 <script>
   let recommendedStretches = [];
@@ -486,6 +769,56 @@
   const _removedCardIds = new Set();
   let soundEnabled = false;
   let stillThinkingTimeout = null;
+  let sessionTransitionTimer = null;
+  let sessionStageActive = false;
+  const SESSION_OPEN_DELAY_MS = 3000;
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function setSessionStage(on) {
+    sessionStageActive = !!on;
+    document.getElementById('stage-pain').classList.toggle('hidden', sessionStageActive);
+    document.getElementById('stage-session').classList.toggle('hidden', !sessionStageActive);
+    const bar = document.getElementById('chat-progress-fill');
+    if (bar) bar.style.width = sessionStageActive ? '100%' : '50%';
+    if (sessionStageActive) {
+      pollPosture();
+    }
+  }
+
+  async function goBackToPain() {
+    if (sessionTransitionTimer) {
+      clearTimeout(sessionTransitionTimer);
+      sessionTransitionTimer = null;
+    }
+    const painIn = document.getElementById('pain-input');
+    if (painIn) painIn.disabled = false;
+    const sendBtn = document.getElementById('recommend-btn');
+    if (sendBtn) sendBtn.disabled = false;
+    const delayHint = document.getElementById('thinking-hint');
+    if (delayHint) {
+      delayHint.style.display = 'none';
+      delayHint.textContent = 'Still thinking… this can take a few seconds.';
+    }
+    try {
+      await fetch('/routine/stop', { method: 'POST' });
+    } catch (_) {}
+    resetRoutineUi();
+    recommendedStretches = [];
+    clearGrid();
+    document.getElementById('start-routine-btn').style.display = 'none';
+    document.getElementById('start-routine-btn').disabled = true;
+    clearMessage();
+    document.querySelectorAll('#pain-chat-thread .chat-row-user').forEach((el) => el.remove());
+    setSessionStage(false);
+    window.scrollTo(0, 0);
+  }
 
   function getCorrectHoldMusicEl() {
     return document.getElementById('correct-hold-music');
@@ -565,6 +898,38 @@
     playRoutineBell();
   }
   document.getElementById('sound-btn').addEventListener('click', enableSound);
+  document.getElementById('back-pain-btn').addEventListener('click', goBackToPain);
+
+  function syncChatComposerHeight() {
+    const ta = document.getElementById('pain-input');
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  }
+  const _painInputEl = document.getElementById('pain-input');
+  if (_painInputEl) {
+    _painInputEl.addEventListener('input', syncChatComposerHeight);
+    _painInputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        getRecommendations();
+      }
+    });
+  }
+
+  function appendPainUserBubble(text) {
+    const thread = document.getElementById('pain-chat-thread');
+    if (!thread) return;
+    const row = document.createElement('div');
+    row.className = 'chat-row chat-row-user';
+    row.innerHTML =
+      '<div class="chat-bubble chat-bubble-user">' + esc(text) + '</div>' +
+      '<div class="chat-avatar chat-avatar-user" aria-hidden="true">' +
+      '<img src="/static/user-default-avatar.svg" width="40" height="40" alt="" />' +
+      '</div>';
+    thread.appendChild(row);
+    row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 
   // ── Health check ────────────────────────────────────────────────
   async function checkHealth() {
@@ -594,6 +959,7 @@
   };
 
   async function pollPosture() {
+    if (!sessionStageActive) return;
     try {
       const r = await fetch('/posture');
       if (!r.ok) return;
@@ -603,7 +969,6 @@
       badge.className = 'posture-badge ' + (POSTURE_CLASS[result] || '');
     } catch { /* ignore */ }
   }
-  pollPosture();
   setInterval(pollPosture, 1500);
 
   // ── Recommendations ─────────────────────────────────────────────
@@ -614,6 +979,11 @@
       return;
     }
 
+    if (sessionTransitionTimer) {
+      clearTimeout(sessionTransitionTimer);
+      sessionTransitionTimer = null;
+    }
+
     // Get current posture
     let posture = 'Good Posture';
     try {
@@ -621,11 +991,13 @@
       if (r.ok) ({ result: posture } = await r.json());
     } catch { /* use default */ }
 
+    appendPainUserBubble(painText);
     setLoading(true);
     clearMessage();
     clearGrid();
     resetRoutineUi();
 
+    let delaySessionNav = false;
     try {
       const r = await fetch('/recommend', {
         method: 'POST',
@@ -647,18 +1019,43 @@
       startBtn.title = stretches.length === 5
         ? 'Start guided routine'
         : 'Need exactly 5 stretches to start routine';
+
+      if (stretches.length > 0) {
+        delaySessionNav = true;
+        sessionTransitionTimer = setTimeout(() => {
+          sessionTransitionTimer = null;
+          const hintEl = document.getElementById('thinking-hint');
+          hintEl.style.display = 'none';
+          hintEl.textContent = 'Still thinking… this can take a few seconds.';
+          setSessionStage(true);
+          window.scrollTo(0, 0);
+          const pi = document.getElementById('pain-input');
+          if (pi) pi.disabled = false;
+          document.getElementById('recommend-btn').disabled = false;
+        }, SESSION_OPEN_DELAY_MS);
+      }
     } catch (err) {
       showMessage('Network error: ' + err.message, 'error');
     } finally {
       setLoading(false);
+      if (delaySessionNav) {
+        document.getElementById('pain-input').disabled = true;
+        document.getElementById('recommend-btn').disabled = true;
+        const hintEl = document.getElementById('thinking-hint');
+        hintEl.textContent = 'Opening your stretch session in a moment…';
+        hintEl.style.display = 'block';
+      }
     }
   }
 
   function setLoading(on) {
     const btn = document.getElementById('recommend-btn');
     btn.disabled = on;
-    document.getElementById('spinner').style.display = on ? 'block' : 'none';
-    document.getElementById('btn-text').textContent = on ? 'Thinking…' : '✨ Recommend stretches';
+    btn.setAttribute('aria-busy', on ? 'true' : 'false');
+    const spin = document.getElementById('spinner');
+    const arrow = document.getElementById('btn-text');
+    if (spin) spin.style.display = on ? 'block' : 'none';
+    if (arrow) arrow.style.display = on ? 'none' : '';
 
     const hint = document.getElementById('thinking-hint');
     hint.style.display = 'none';
@@ -668,7 +1065,6 @@
     }
     if (on) {
       stillThinkingTimeout = setTimeout(() => {
-        document.getElementById('btn-text').textContent = 'Still thinking…';
         hint.style.display = 'block';
       }, 3000);
     }
@@ -677,11 +1073,12 @@
   function showMessage(text, type) {
     const el = document.getElementById('message');
     el.textContent = text;
-    el.className = type;
+    el.className = 'global-msg ' + type;
     el.style.display = 'block';
   }
   function clearMessage() {
     const el = document.getElementById('message');
+    el.className = 'global-msg';
     el.style.display = 'none';
   }
   function clearGrid() {
@@ -862,7 +1259,7 @@
     if (status.is_correct) {
       panel.classList.add('correct');
       fill.classList.add('correct');
-      document.getElementById('feed-wrapper').style.boxShadow = '0 0 0 3px rgba(141,207,141,0.7)';
+      document.getElementById('feed-wrapper').style.boxShadow = '0 0 0 3px rgba(170, 232, 210, 0.95)';
     } else {
       panel.classList.add('incorrect');
       document.getElementById('feed-wrapper').style.boxShadow = 'none';
@@ -922,15 +1319,6 @@
     } catch { /* ignore */ }
   }
   loadLibrary();
-
-  // ── Utility ──────────────────────────────────────────────────────
-  function esc(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
 </script>
 </body>
 </html>
