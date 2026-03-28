@@ -1,8 +1,11 @@
 import json
 import logging
 import os
+import urllib.error
+import urllib.request
+from urllib.parse import urlparse, unquote
 
-from flask import Flask, Response, jsonify, request, render_template
+from flask import Flask, Response, abort, jsonify, request, render_template
 from flask_cors import CORS
 
 from posture_detector import (
@@ -16,19 +19,20 @@ from posture_detector import (
 from library import STRETCH_LIBRARY, fallback_stretches
 from claude_client import recommend_stretches
 
-# Enrich STRETCH_LIBRARY with image URLs from stretches.json
+# Enrich STRETCH_LIBRARY with media URLs from stretches.json
 _json_path = os.path.join(os.path.dirname(__file__), "stretches.json")
+_STRETCH_JSON_BY_ID = {}
 try:
-    with open(_json_path, "r") as _f:
-        _json_data = {s["id"]: s for s in json.load(_f)}
+    with open(_json_path, "r", encoding="utf-8") as _f:
+        _STRETCH_JSON_BY_ID = {s["id"]: s for s in json.load(_f) if isinstance(s, dict) and s.get("id")}
     for _s in STRETCH_LIBRARY:
-        _entry = _json_data.get(_s["id"], {})
+        _entry = _STRETCH_JSON_BY_ID.get(_s["id"], {})
         if "gif_url" in _entry:
             _s["gif_url"] = _entry["gif_url"]
         if "image_url" in _entry:
             _s["image_url"] = _entry["image_url"]
-except Exception:
-    pass
+except Exception as exc:
+    logging.getLogger(__name__).warning("Failed to load stretches.json media metadata: %s", exc)
 
 app = Flask(__name__)
 CORS(app)
@@ -53,6 +57,100 @@ def health():
     return jsonify({"status": "ok", "webcam": _webcam_available})
 
 
+def _unsafe_image_hostname(hostname: str) -> bool:
+    """Basic SSRF guard: block private / loopback hosts."""
+    h = (hostname or "").lower().strip()
+    if not h:
+        return True
+    if h in ("localhost", "0.0.0.0", "::1"):
+        return True
+    if h.endswith(".localhost") or h.endswith(".local") or h.endswith(".internal"):
+        return True
+    parts = h.split(".")
+    if len(parts) == 4 and all(p.isdigit() for p in parts):
+        a, b, c, d = (int(p) for p in parts)
+        if a in (0, 10, 127) or (a == 169 and b == 254):
+            return True
+        if a == 172 and 16 <= b <= 31:
+            return True
+        if a == 192 and b == 168:
+            return True
+    return False
+
+
+def _sniff_image_mimetype(data: bytes) -> str | None:
+    """Infer image/* type from magic bytes when headers are wrong/missing."""
+    if len(data) < 12:
+        return None
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:2] == b"\xff\xd8":
+        return "image/jpeg"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[:2] == b"BM":
+        return "image/bmp"
+    return None
+
+
+def _image_proxy_headers() -> dict[str, str]:
+    """Some CDNs reject bare agents; send browser-like headers."""
+    return {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+
+@app.route("/image-proxy")
+def image_proxy():
+    """Fetch remote image server-side to avoid browser-side hotlink restrictions."""
+    raw = request.args.get("url", "")
+    try:
+        url = unquote(raw)
+    except Exception:
+        url = raw
+    parsed = urlparse(url)
+    if parsed.scheme not in ("https", "http"):
+        abort(400)
+    if _unsafe_image_hostname(parsed.hostname or ""):
+        abort(400)
+
+    req = urllib.request.Request(url, headers=_image_proxy_headers(), method="GET")
+    max_bytes = 4 * 1024 * 1024
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = resp.read(max_bytes + 1)
+            if len(data) > max_bytes:
+                abort(413)
+            header_ct = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            sniffed = _sniff_image_mimetype(data)
+            sample = data[:256].lstrip()
+
+            if header_ct.startswith("image/"):
+                mimetype = header_ct
+            elif sniffed:
+                mimetype = sniffed
+            elif sample.startswith(b"<?xml") or sample.startswith(b"<svg"):
+                mimetype = "image/svg+xml"
+            else:
+                abort(415)
+
+            return Response(data, mimetype=mimetype)
+    except urllib.error.HTTPError as exc:
+        logger.warning("image-proxy HTTP error for %s: %s", url, exc)
+        abort(502)
+    except Exception as exc:
+        logger.warning("image-proxy failed for %s: %s", url, exc)
+        abort(502)
+
+
 @app.route("/video_feed")
 def video_feed():
     if not _webcam_available:
@@ -75,7 +173,20 @@ def stretches():
 
 @app.route("/routine/status")
 def routine_status():
-    return jsonify(get_routine_status())
+    status = get_routine_status()
+    cur = status.get("current_stretch")
+    if isinstance(cur, dict):
+        sid = cur.get("id")
+        if sid:
+            entry = _STRETCH_JSON_BY_ID.get(sid, {})
+            if isinstance(entry, dict):
+                merged = dict(cur)
+                if entry.get("gif_url"):
+                    merged["gif_url"] = entry.get("gif_url")
+                if entry.get("image_url"):
+                    merged["image_url"] = entry.get("image_url")
+                status["current_stretch"] = merged
+    return jsonify(status)
 
 
 @app.route("/routine/stop", methods=["POST"])
