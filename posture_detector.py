@@ -26,11 +26,38 @@ Install deps:
 """
 
 # ── Imports ──────────────────────────────────────────────────────────────────
+import os
+import platform
 import threading
 import time
 import numpy as np
 import cv2
 import mediapipe as mp
+
+
+def _camera_device_index() -> int:
+    try:
+        return int(os.environ.get("CAMERA_INDEX", "0"))
+    except ValueError:
+        return 0
+
+
+def _video_capture(index: int = 0) -> cv2.VideoCapture:
+    """OpenCV capture with a backend that works reliably on macOS (often fixes all-black frames)."""
+    if platform.system() == "Darwin":
+        # AVFoundation avoids many cases where the default backend opens but returns black frames.
+        cap = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
+        if cap.isOpened():
+            return cap
+        cap.release()
+        return cv2.VideoCapture(index)
+    return cv2.VideoCapture(index)
+
+
+def _warmup_capture(cap: cv2.VideoCapture, n: int = 15) -> None:
+    """Discard initial frames; built-in / Continuity cameras often need a moment before valid pixels."""
+    for _ in range(n):
+        cap.read()
 
 # ── MediaPipe setup ───────────────────────────────────────────────────────────
 _mp_pose = mp.solutions.pose
@@ -579,14 +606,19 @@ def _camera_loop() -> None:
     """
     global _latest_frame, _camera_running
 
-    cap = cv2.VideoCapture(0)
+    idx = _camera_device_index()
+    cap = _video_capture(idx)
     if not cap.isOpened():
         _camera_running = False
         return
     # Keep frames lightweight for lower detection latency on CPU-only setups.
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    if platform.system() != "Darwin":
+        # On macOS, buffer size 1 can worsen black-frame issues with some cameras.
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+    _warmup_capture(cap)
 
     with _mp_pose.Pose(
         min_detection_confidence=0.5,
@@ -626,10 +658,11 @@ def start_camera() -> bool:
         return True  # already running
 
     # Quick probe — don't hold the camera open
-    probe = cv2.VideoCapture(0)
+    probe = _video_capture(_camera_device_index())
     if not probe.isOpened():
         probe.release()
         return False
+    _warmup_capture(probe, n=8)
     probe.release()
 
     _camera_running = True
