@@ -345,6 +345,96 @@
     }
     .feed-offline .icon { font-size: 2.5rem; }
 
+    /* ── Session summary (centered on camera when routine finishes) ── */
+    .session-summary-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      background: rgba(15, 26, 21, 0.5);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+    .session-summary-overlay.visible {
+      display: flex;
+    }
+    .session-summary-card {
+      width: min(92%, 340px);
+      max-height: 86%;
+      overflow-y: auto;
+      background: linear-gradient(165deg, #ffffff 0%, var(--mint-soft) 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow:
+        0 12px 40px rgba(20, 34, 26, 0.25),
+        0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+      padding: 16px 18px 14px;
+      text-align: center;
+    }
+    .session-summary-card h3 {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .session-summary-card .session-summary-rows {
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .session-summary-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: 8px;
+      border: 1px solid rgba(155, 216, 191, 0.6);
+    }
+    .session-summary-row .idx {
+      flex-shrink: 0;
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 0.78rem;
+      min-width: 1.1rem;
+    }
+    .session-summary-row .row-main {
+      flex: 1;
+      min-width: 0;
+    }
+    .session-summary-row .stretch-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .session-summary-row .muscle {
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .session-summary-dismiss {
+      width: 100%;
+      margin-top: 2px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      background: var(--mint);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .session-summary-dismiss:hover {
+      background: var(--mint-hover);
+    }
+
     /* ── Posture badge ── */
     #posture-badge {
       display: inline-flex;
@@ -780,6 +870,13 @@
         <div class="icon">📷</div>
         <div>Webcam not available</div>
       </div>
+      <div id="session-summary-overlay" class="session-summary-overlay" role="dialog" aria-labelledby="session-summary-heading" aria-hidden="true" hidden>
+        <div class="session-summary-card">
+          <h3 id="session-summary-heading">You completed</h3>
+          <div id="session-summary-rows" class="session-summary-rows"></div>
+          <button type="button" class="session-summary-dismiss" id="session-summary-dismiss">Dismiss</button>
+        </div>
+      </div>
     </div>
     <div id="posture-badge">
       <div id="posture-dot"></div>
@@ -853,6 +950,48 @@
       .replace(/"/g, '&quot;');
   }
 
+  function hideSessionSummaryOverlay() {
+    const el = document.getElementById('session-summary-overlay');
+    if (!el) return;
+    el.classList.remove('visible');
+    el.setAttribute('aria-hidden', 'true');
+    el.setAttribute('hidden', '');
+  }
+
+  function showSessionSummaryOverlay(completedIds) {
+    const overlay = document.getElementById('session-summary-overlay');
+    const rowsEl = document.getElementById('session-summary-rows');
+    const heading = document.getElementById('session-summary-heading');
+    if (!overlay || !rowsEl || !heading) return;
+    const ids = Array.isArray(completedIds) ? completedIds : [];
+    const byId = Object.fromEntries(recommendedStretches.map((s) => [s.id, s]));
+    if (!ids.length) {
+      heading.textContent = 'Session summary';
+      rowsEl.innerHTML =
+        '<div class="session-summary-row"><span class="idx"></span><div class="row-main"><div class="stretch-name">No stretches were logged.</div><div class="muscle">—</div></div></div>';
+    } else {
+      heading.textContent =
+        ids.length >= 5
+          ? 'You completed all 5 stretches'
+          : `You completed ${ids.length} stretch${ids.length === 1 ? '' : 'es'}`;
+      rowsEl.innerHTML = ids
+        .map((id, i) => {
+          const s = byId[id] || {};
+          return `<div class="session-summary-row">
+          <span class="idx">${i + 1}</span>
+          <div class="row-main">
+            <div class="stretch-name">${esc(s.name || id)}</div>
+            <div class="muscle">Target muscle: ${esc(s.target_muscle || '—')}</div>
+          </div>
+        </div>`;
+        })
+        .join('');
+    }
+    overlay.classList.add('visible');
+    overlay.removeAttribute('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+
   function setSessionStage(on) {
     sessionStageActive = !!on;
     document.getElementById('stage-pain').classList.toggle('hidden', sessionStageActive);
@@ -881,6 +1020,7 @@
     try {
       await fetch('/routine/stop', { method: 'POST' });
     } catch (_) {}
+    hideSessionSummaryOverlay();
     resetRoutineUi();
     recommendedStretches = [];
     clearGrid();
@@ -1177,6 +1317,7 @@
     fill.className = '';
     document.getElementById('feed-wrapper').style.boxShadow = 'none';
     document.getElementById('stop-routine-btn').style.display = 'none';
+    hideSessionSummaryOverlay();
     lastRoutineIndex = null;
     lastRoutineState = null;
     stopCorrectHoldMusic();
@@ -1198,6 +1339,7 @@
         showMessage(data.error || 'Failed to start routine.', 'error');
         return;
       }
+      hideSessionSummaryOverlay();
       showMessage('Routine started. Hold each stretch when the form status turns correct.', 'info');
       document.getElementById('routine-panel').style.display = 'block';
       document.getElementById('start-routine-btn').style.display = 'none';
@@ -1243,6 +1385,7 @@
     fill.className = '';
 
     if (status.state === 'inactive') {
+      hideSessionSummaryOverlay();
       document.getElementById('routine-title').textContent = 'Routine not started';
       document.getElementById('routine-feedback').textContent = 'Click Start stretch routine to begin.';
       document.getElementById('routine-meta').textContent = '';
@@ -1279,11 +1422,13 @@
         clearInterval(routinePollHandle);
         routinePollHandle = null;
       }
+      showSessionSummaryOverlay(status.completed_ids);
       lastRoutineState = status.state;
       lastRoutineIndex = status.index ?? null;
       return;
     }
 
+    hideSessionSummaryOverlay();
     const cur = status.current_stretch || {};
 
     // Show stretch image (gif preferred, fallback to image_url)
@@ -1392,7 +1537,9 @@
     } catch { /* ignore */ }
   }
   loadLibrary();
- pain-cam-input-c888a
+
+  document.getElementById('session-summary-dismiss').addEventListener('click', hideSessionSummaryOverlay);
+
   function renderTargetMuscleSummary(stretches) {
     const container = document.getElementById('target-muscle-summary');
     if (!container || !Array.isArray(stretches) || !stretches.length) {
@@ -1425,16 +1572,6 @@
       })
       .join('');
   }
-
-  // ── Utility ──────────────────────────────────────────────────────
-  function esc(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
- main
 </script>
 </body>
 </html>
