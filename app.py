@@ -105,23 +105,19 @@ def routine_start():
                 if sid in by_id:
                     chosen.append(by_id[sid])
 
-        # Deduplicate while preserving order
-        deduped = []
-        seen = set()
-        for s in chosen:
-            sid = s["id"]
-            if sid not in seen:
-                deduped.append(s)
-                seen.add(sid)
-
-        if len(deduped) != 5:
+        if len(chosen) != 5:
             return jsonify({"error": "Routine requires exactly 5 valid stretches."}), 400
 
-        start_routine(deduped)
+        start_routine(chosen)
         return jsonify({"ok": True, "status": get_routine_status()})
     except Exception as exc:
         logger.error("Error in /routine/start: %s", exc)
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/fallback")
+def fallback():
+    return jsonify({"stretches": fallback_stretches()})
 
 
 @app.route("/recommend", methods=["POST"])

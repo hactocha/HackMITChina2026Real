@@ -389,21 +389,23 @@ def validate_S15(lm):
     if not ok:
         return False, msg
 
-    # From a side view the stretched foot slides back, creating a large x offset
-    # between that ankle and its hip. abs() makes this symmetric for left/right camera.
-    left_foot_back  = abs(lm[27].x - lm[23].x) > 0.10  # left ankle vs left hip
-    right_foot_back = abs(lm[28].x - lm[24].x) > 0.10  # right ankle vs right hip
+    # From a side view, the extended leg has a near-straight knee angle (hip-knee-ankle).
+    # abs() on the x offset ensures this works for camera on either left or right side.
+    left_leg_angle  = _angle_from_idx(lm, 23, 25, 27)
+    right_leg_angle = _angle_from_idx(lm, 24, 26, 28)
+    left_extended  = left_leg_angle  > 155
+    right_extended = right_leg_angle > 155
 
-    # Exactly one leg stretched — the foot closest to the camera slides back
-    one_foot_back = left_foot_back ^ right_foot_back
+    # Exactly one leg extended (the one closest to the camera)
+    one_leg_extended = left_extended ^ right_extended
 
-    # Torso upright: shoulder well above hip
+    # Torso upright: shoulders well above hips
     shoulder_mid_y = (lm[11].y + lm[12].y) / 2.0
     hip_mid_y      = (lm[23].y + lm[24].y) / 2.0
     torso_upright  = abs(shoulder_mid_y - hip_mid_y) > 0.16
 
-    valid = one_foot_back and torso_upright
-    return valid, "Slide one foot back behind you and keep your torso upright to stretch your hip flexor."
+    valid = one_leg_extended and torso_upright
+    return valid, "Extend one leg straight out in front with toes up and keep your torso upright."
 
 
 def validate_S16(lm):
