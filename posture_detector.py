@@ -26,8 +26,6 @@ Install deps:
 """
 
 # ── Imports ──────────────────────────────────────────────────────────────────
-import os
-import platform
 import threading
 import time
 import numpy as np
