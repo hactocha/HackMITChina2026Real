@@ -107,7 +107,7 @@ STRETCH_LIBRARY = [
             "Continue rolling slowly for 20 seconds.",
         ],
         "camera_angle": "front",
-        "camera_instruction": "Sit or stand facing the camera so it can see both shoulders moving in equal circles.",
+        "camera_instruction": "Face the camera with both shoulders in frame; arms can stay at your sides — the tracker follows shoulder motion.",
         "difficulty": "Easy",
         "emoji": "🔁",
     },

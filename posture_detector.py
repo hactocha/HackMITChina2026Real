@@ -115,6 +115,14 @@ def _reset_s18_ankle_state() -> None:
     _s18_ankle_state["samples"] = []
 
 
+# S06: shoulder rolls — arms stay down; only shoulders need to be visible; green from vertical motion
+_s06_roll_state = {"samples": []}  # (t_mono, left_sh_y, right_sh_y, mid_shoulder_x)
+
+
+def _reset_s06_roll_state() -> None:
+    _s06_roll_state["samples"] = []
+
+
 def _reset_s20_fan_state() -> None:
     _s20_fan_state["saw_spread"] = False
     _s20_fan_state["last_cycle_t"] = None
@@ -233,12 +241,63 @@ def validate_S05(lm):
     return correct, "Tilt your head back and look up at the ceiling."
 
 
+def _require_s06_shoulders_only(lm) -> tuple[bool, str]:
+    """Shoulder rolls use arms at sides — elbows/wrists need not be visible."""
+    for idx in (11, 12):
+        if not _landmark_is_visible(lm, idx):
+            return False, "Face the camera so both shoulders are visible (arms can stay at your sides)."
+    return True, ""
+
+
 def validate_S06(lm):
-    ok, msg = _require_core_upper_body(lm)
+    """
+    Shoulder roll: detect repeated vertical motion of shoulder landmarks (up–back–down).
+    Depth of the circular path is not observable; 2D y oscillation is the reliable cue.
+    Reject whole-body side-to-side turning by capping horizontal drift of the shoulder midline.
+    """
+    _WINDOW_S = 0.9
+    _MIN_SAMPLES = 7
+    # Normalised y span (~1–3 cm motion on a typical torso crop); rejects static hold / jitter
+    _MIN_SPAN_Y = 0.016
+    # Max lateral drift of (L+R shoulder x)/2 over the window, as fraction of frame width.
+    # ~1 cm total peak-to-peak vs ~90 cm horizontal extent at the body (tune 90.0 for your FOV).
+    _MAX_MID_X_SPAN = 1.0 / 90.0
+
+    ok, msg = _require_s06_shoulders_only(lm)
     if not ok:
+        _reset_s06_roll_state()
         return False, msg
-    shoulder_raise = ((lm[11].y + lm[12].y) / 2.0) < ((lm[23].y + lm[24].y) / 2.0) - 0.22
-    return shoulder_raise, "Lift shoulders up and roll backward in a smooth circle."
+
+    now = time.monotonic()
+    ly, ry = float(lm[11].y), float(lm[12].y)
+    mid_x = (float(lm[11].x) + float(lm[12].x)) * 0.5
+    samples = _s06_roll_state["samples"]
+    samples.append((now, ly, ry, mid_x))
+    cutoff = now - _WINDOW_S
+    while samples and samples[0][0] < cutoff:
+        samples.pop(0)
+
+    if len(samples) < _MIN_SAMPLES:
+        return False, "Roll both shoulders slowly — up, back, and down — so the camera sees them moving."
+
+    mid_xs = [r[3] for r in samples]
+    x_span = max(mid_xs) - min(mid_xs)
+    if x_span > _MAX_MID_X_SPAN:
+        return False, "Stay facing the camera — roll shoulders in place without turning side to side."
+
+    left_span = max(r[1] for r in samples) - min(r[1] for r in samples)
+    right_span = max(r[2] for r in samples) - min(r[2] for r in samples)
+    mid_y = [(r[1] + r[2]) * 0.5 for r in samples]
+    mid_span = max(mid_y) - min(mid_y)
+
+    motion_ok = (
+        mid_span >= _MIN_SPAN_Y
+        or left_span >= _MIN_SPAN_Y
+        or right_span >= _MIN_SPAN_Y
+    )
+    if motion_ok:
+        return True, "Good — keep rolling your shoulders in smooth circles."
+    return False, "Keep moving: shrug shoulders upward and roll them backward and down."
 
 
 def validate_S07(lm):
@@ -807,6 +866,8 @@ def validate_stretch_form(stretch_id: str, lm):
         _reset_s20_fan_state()
     if stretch_id != "S18":
         _reset_s18_ankle_state()
+    if stretch_id != "S06":
+        _reset_s06_roll_state()
     validator = _STRETCH_VALIDATORS.get(stretch_id)
     if validator is None:
         return False, "No validator available for this stretch."
@@ -874,6 +935,7 @@ def start_routine(stretches: list[dict]):
     with _routine_lock:
         _reset_s20_fan_state()
         _reset_s18_ankle_state()
+        _reset_s06_roll_state()
         _routine_state["state"] = "running"
         _routine_state["stretches"] = stretches[:]
         _routine_state["current_index"] = 0
@@ -891,6 +953,7 @@ def stop_routine():
     with _routine_lock:
         _reset_s20_fan_state()
         _reset_s18_ankle_state()
+        _reset_s06_roll_state()
         _routine_state["state"] = "inactive"
         _routine_state["stretches"] = []
         _routine_state["current_index"] = 0
