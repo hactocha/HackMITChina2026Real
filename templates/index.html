@@ -1540,23 +1540,6 @@
 
   document.getElementById('session-summary-dismiss').addEventListener('click', hideSessionSummaryOverlay);
 
-  // ── Dev shortcut: skip chat and go straight to fallback stretches ──
-  async function autoStartFallback() {
-    try {
-      const r = await fetch('/fallback');
-      const data = await r.json();
-      const stretches = data.stretches || [];
-      if (!stretches.length) return;
-      recommendedStretches = stretches;
-      renderStretches(stretches);
-      setSessionStage(true);
-      await startRoutine();
-    } catch (err) {
-      showMessage('Auto-start failed: ' + err.message, 'error');
-    }
-  }
-  autoStartFallback();
-
   function renderTargetMuscleSummary(stretches) {
     const container = document.getElementById('target-muscle-summary');
     if (!container || !Array.isArray(stretches) || !stretches.length) {
