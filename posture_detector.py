@@ -32,6 +32,36 @@ import numpy as np
 import cv2
 import mediapipe as mp
 
+import threading
+import time
+import numpy as np
+import cv2
+import mediapipe as mp
+
+
+def _camera_device_index() -> int:
+    try:
+        return int(os.environ.get("CAMERA_INDEX", "0"))
+    except ValueError:
+        return 0
+
+
+def _video_capture(index: int = 0) -> cv2.VideoCapture:
+    """OpenCV capture with a backend that works reliably on macOS (often fixes all-black frames)."""
+    if platform.system() == "Darwin":
+        # AVFoundation avoids many cases where the default backend opens but returns black frames.
+        cap = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
+        if cap.isOpened():
+            return cap
+        cap.release()
+        return cv2.VideoCapture(index)
+    return cv2.VideoCapture(index)
+
+
+def _warmup_capture(cap: cv2.VideoCapture, n: int = 15) -> None:
+    """Discard initial frames; built-in / Continuity cameras often need a moment before valid pixels."""
+    for _ in range(n):
+        cap.read()
 # ── MediaPipe setup ───────────────────────────────────────────────────────────
 _mp_pose = mp.solutions.pose
 _mp_draw = mp.solutions.drawing_utils
