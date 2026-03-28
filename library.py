@@ -137,7 +137,7 @@ STRETCH_LIBRARY = [
         "pain_keywords": ["upper back pain", "rounded shoulders", "shoulder blade pain"],
         "steps": [
             "Sit up straight with feet flat and hands resting on your thighs.",
-            "Draw both shoulder blades toward each other as if trying to hold a pencil between them.",
+            "Draw both shoulder blades toward  each other behind you as if trying to hold a pencil between them.",
             "Hold the squeeze for 25 seconds then slowly release.",
         ],
         "camera_angle": "front",
@@ -354,6 +354,6 @@ STRETCH_LIBRARY = [
 
 def fallback_stretches() -> list:
     """Return 5 safe general stretches used when the AI recommendation fails."""
-    fallback_ids = ["S05", "S04", "S15", "S11", "S11"]
+    fallback_ids = ["S06", "S08", "S13", "S16", "S10"]
     by_id = {s["id"]: s for s in STRETCH_LIBRARY}
     return [by_id[sid] for sid in fallback_ids if sid in by_id]
