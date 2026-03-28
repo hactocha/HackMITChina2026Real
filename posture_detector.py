@@ -259,54 +259,151 @@ def validate_S09(lm):
         return False, msg
     wrists_back = (lm[15].y > lm[11].y and lm[16].y > lm[12].y and abs(lm[15].x - lm[16].x) < 0.20)
     return wrists_back, "Clasp hands behind your back and lift chest gently."
-
+def validate_S10(lm):
+    ok, msg = _require_core_upper_body(lm)
+    if not ok:
+        return False, msg
+    
+    # Wrists clasped and below shoulders
+    wrists_together = abs(lm[15].x - lm[16].x) < 0.15
+    wrists_low = lm[15].y > lm[11].y and lm[16].y > lm[12].y
+    
+    # Wrists behind torso
+    #center_x = (lm[11].x + lm[12].x) / 2
+    #wrists_back = lm[15].x < center_x and lm[16].x < center_x
+    
+    # Arms relatively straight
+    left_straight = _angle_from_idx(lm, 11, 13, 15) > 135
+    right_straight = _angle_from_idx(lm, 12, 14, 16) > 135
+    
+    # Shoulder blades squeezed
+    shoulder_width = abs(lm[11].x - lm[12].x)
+    #elbow_width = abs(lm[13].x - lm[14].x)
+    wrist_width = abs(lm[15].x - lm[16].x)
+    squeezed = shoulder_width > wrist_width * 1.25
+    
+    valid = wrists_together and wrists_low and left_straight and right_straight and squeezed
+    return valid, "Clasp hands behind your back and lift chest gently."
 
 def validate_S11(lm):
     ok, msg = _require_core_full_body(lm)
     if not ok:
         return False, msg
+
+    # Torso offset: shoulder midpoint shifts laterally relative to hip midpoint
     shoulder_mid_x = (lm[11].x + lm[12].x) / 2.0
     hip_mid_x = (lm[23].x + lm[24].x) / 2.0
-    twisted = abs(shoulder_mid_x - hip_mid_x) > 0.04
+    torso_offset = abs(shoulder_mid_x - hip_mid_x) > 0.03
+
+    # Shoulder stacking: from side view, shoulders appear narrower when torso twists
+    shoulder_width = abs(lm[11].x - lm[12].x)
+    hip_width = abs(lm[23].x - lm[24].x)
+    shoulders_stacked = shoulder_width < hip_width * 0.80
+
+    # Cross-body arm: one wrist should be near the opposite knee
+    r_wrist_to_l_knee = abs(lm[15].x - lm[26].x) + abs(lm[15].y - lm[26].y)
+    l_wrist_to_r_knee = abs(lm[16].x - lm[25].x) + abs(lm[16].y - lm[25].y)
+    cross_body_arm = r_wrist_to_l_knee < 0.20 or l_wrist_to_r_knee < 0.20
+
+    # Head turned: nose deviates from shoulder midpoint in x (head rotates with twist)
+    nose_x = lm[0].x
+    head_turned = abs(nose_x - shoulder_mid_x) < 0.07 
+
+    twisted = (torso_offset or shoulders_stacked) and (cross_body_arm or head_turned)
     return twisted, "Twist your torso to one side while keeping hips stable."
 
 
 def validate_S12(lm):
-    ok, msg = _require_core_full_body(lm)
+    ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
-    shoulder_mid_y = (lm[11].y + lm[12].y) / 2.0
-    hip_mid_y = (lm[23].y + lm[24].y) / 2.0
-    folded = shoulder_mid_y > hip_mid_y - 0.03
-    return folded, "Fold your torso forward toward your thighs."
+
+    # One wrist must be raised above the head (above nose level)
+    nose_y = lm[0].y
+    r_wrist_raised = lm[15].y < nose_y - 0.05
+    l_wrist_raised = lm[16].y < nose_y - 0.05
+    left_raised = _angle_from_idx(lm, 12, 11, 13) > 140
+    right_raised = _angle_from_idx(lm, 11, 12, 14) > 140
+    arm_raised = (r_wrist_raised and right_raised) or (l_wrist_raised and left_raised)
+
+    # Torso must lean laterally: shoulder midpoint shifts horizontally vs hip midpoint
+    shoulder_mid_x = (lm[11].x + lm[12].x) / 2.0
+    hip_mid_x = (lm[23].x + lm[24].x) / 2.0
+    lateral_lean = abs(shoulder_mid_x - hip_mid_x) > 0.04
+
+    valid = arm_raised and lateral_lean
+    return valid, "Raise one arm overhead and lean your torso to the opposite side."
 
 
 def validate_S13(lm):
-    ok, msg = _require_core_full_body(lm)
+    ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
-    spine_angle = _angle_from_idx(lm, 11, 23, 25)
-    active = spine_angle < 165 or spine_angle > 195
-    return active, "Alternate between arching and rounding your spine."
+
+    ear_y = (lm[7].y + lm[8].y) / 2.0
+
+    # Both wrists must be raised to at least ear level (hands behind head)
+    wrists_up = lm[15].y > (ear_y - 0.02) and lm[16].y > (ear_y - 0.02)
+
+    # Elbows must be flared wider than shoulders
+    elbow_width = abs(lm[13].x - lm[14].x)
+    shoulder_width = abs(lm[11].x - lm[12].x)
+    elbows_flared = elbow_width > shoulder_width * 1.75
+
+    # Arms bent at elbow (hands behind head, not straight up)
+    left_arm_flex = _angle_from_idx(lm, 12, 14, 16) < 70
+    right_arm_flex = _angle_from_idx(lm, 11, 13, 15) < 70
+
+    # Looking upward: nose rises above ear level (head tilted back)
+    looking_up = lm[0].y > ear_y + 0.03
+
+    valid = wrists_up and elbows_flared and left_arm_flex and right_arm_flex and looking_up
+    return valid, "Interlace fingers behind your head, flare your elbows to the sides, and look upwards."
 
 
 def validate_S14(lm):
     ok, msg = _require_core_full_body(lm)
     if not ok:
         return False, msg
-    shoulder_mid_z = (lm[11].z + lm[12].z) / 2.0
-    hip_mid_z = (lm[23].z + lm[24].z) / 2.0
-    extended = shoulder_mid_z > hip_mid_z + 0.03
-    return extended, "Lean gently backward from the lower back."
+
+    head_mid_x = (lm[7].x + lm[8].x) / 2.0
+    shoulder_mid_x = (lm[11].x + lm[12].x) / 2.0
+    hip_mid_x = (lm[23].x + lm[24].x) / 2.0
+    knee_mid_x = (lm[25].x + lm[26].x) / 2.0
+
+    # From a side view, backward lean shifts shoulders behind hips in x.
+    # Use abs() since user may face either left or right.
+    heads_behind_shoulders = abs(head_mid_x - shoulder_mid_x) > 0.04
+
+    shoulder_behind_hips = abs(shoulder_mid_x - hip_mid_x) > 0.08
+
+    # Hips stay forward over knees — hips and knees remain roughly x-aligned.
+    hips_over_knees = abs(hip_mid_x - knee_mid_x) < 0.15 and abs(hip_mid_x - knee_mid_x) > 0.04
+
+    extended = shoulder_behind_hips and hips_over_knees
+    return extended, "Lean gently backward from the lower back, keeping your hips forward over your knees."
 
 
 def validate_S15(lm):
     ok, msg = _require_core_full_body(lm)
     if not ok:
         return False, msg
-    one_hip_open = abs(lm[25].x - lm[23].x) > 0.06 or abs(lm[26].x - lm[24].x) > 0.06
-    torso_upright = abs(lm[11].y - lm[23].y) > 0.16
-    return one_hip_open and torso_upright, "Keep torso upright and shift hips to stretch one hip flexor."
+
+    # From a side view the stretched foot slides back, creating a large x offset
+    # between that ankle and its hip. abs() makes this symmetric for left/right camera.
+    left_foot_back  = abs(lm[27].x - lm[23].x) > 0.10  # left ankle vs left hip
+    right_foot_back = abs(lm[28].x - lm[24].x) > 0.10  # right ankle vs right hip
+
+    # Exactly one leg stretched — the foot closest to the camera slides back
+    one_foot_back = left_foot_back ^ right_foot_back
+
+    # Torso upright: shoulder well above hip
+    shoulder_mid_y = (lm[11].y + lm[12].y) / 2.0
+    hip_mid_y      = (lm[23].y + lm[24].y) / 2.0
+    torso_upright  = abs(shoulder_mid_y - hip_mid_y) > 0.16
+
+    valid = one_foot_back and torso_upright
+    return valid, "Slide one foot back behind you and keep your torso upright to stretch your hip flexor."
 
 
 def validate_S16(lm):
@@ -315,7 +412,7 @@ def validate_S16(lm):
         return False, msg
     left_pose = _wrist_extended_forward(lm, "left") and _angle_from_idx(lm, 13, 15, 19) < 145
     right_pose = _wrist_extended_forward(lm, "right") and _angle_from_idx(lm, 14, 16, 20) < 145
-    return (left_pose or right_pose), "Extend one arm palm-up and bend wrist downward."
+    return (left_pose or right_pose), "Extend one arm palm-up and bend wrist downward. Make sure the bent arm is the one further away."
 
 
 def validate_S17(lm):
@@ -756,15 +853,10 @@ def _process_frame(frame: np.ndarray, pose) -> np.ndarray:
         # Draw angles for S09 stretch
         routine = get_routine_status()
         current_stretch = routine.get("current_stretch")
-        if current_stretch and current_stretch.get("id") == "S09":
-            frame = draw_angle_between_joints(frame, lm, 11, 13, 15)  # left elbow
-            frame = draw_angle_between_joints(frame, lm, 12, 14, 16)  # right elbow
-            frame = draw_distance_between_joints(frame, lm, 15, 11, text_color=(0, 255, 255))  # left wrist to shoulder distance
-            frame = draw_distance_between_joints(frame, lm, 16, 12, text_color=(0, 255, 255))  # right wrist to shoulder distance
-            # Debug: confirm S09 is running
-            cv2.putText(frame, "S09 Active", (10, 130),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
-        
+        if current_stretch and current_stretch.get("id") == "S12":
+            frame = draw_angle_between_joints(frame, lm, 11, 12, 14)  # left elbow
+            frame = draw_angle_between_joints(frame, lm, 12, 11, 13)  # right elbow
+
         raw   = _analyse_landmarks(lm)
         label = _smooth_label(raw)
         with _posture_lock:
