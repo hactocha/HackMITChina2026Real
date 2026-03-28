@@ -31,6 +31,8 @@ try:
             _s["gif_url"] = _entry["gif_url"]
         if "image_url" in _entry:
             _s["image_url"] = _entry["image_url"]
+        if "body_region" in _entry:
+            _s["body_region"] = _entry["body_region"]
 except Exception as exc:
     logging.getLogger(__name__).warning("Failed to load stretches.json media metadata: %s", exc)
 
