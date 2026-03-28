@@ -106,6 +106,14 @@ _last_routine_tick: Optional[float] = None
 # S20: finger fan must repeat (spread → close); not a static pose
 _s20_fan_state = {"saw_spread": False, "last_cycle_t": None, "spread_entered_t": None}
 
+# S18: lifted foot alone is not enough — need visible ankle rotation (angle variation over time)
+_s18_ankle_state = {"active_side": None, "samples": []}  # samples: list[tuple[float, float]] = (monotonic_t, angle_deg)
+
+
+def _reset_s18_ankle_state() -> None:
+    _s18_ankle_state["active_side"] = None
+    _s18_ankle_state["samples"] = []
+
 
 def _reset_s20_fan_state() -> None:
     _s20_fan_state["saw_spread"] = False
@@ -557,13 +565,88 @@ def validate_S17(lm):
     )
 
 
+def _require_s18_landmarks(lm) -> tuple[bool, str]:
+    """S18 seated ankle mobility: shoulders, hips, knees, both ankles visible."""
+    for idx in (11, 12, 23, 24, 25, 26, 27, 28):
+        if not _landmark_is_visible(lm, idx):
+            return False, "Step back so shoulders, hips, knees, and both feet/ankles are visible."
+    return True, ""
+
+
+def _s18_foot_tip_angle_deg(lm, side: str) -> Optional[float]:
+    """Interior angle at ankle: knee–ankle–toe (or heel if toe not visible). None if missing."""
+    if side == "left":
+        knee, ank, toe, heel = 25, 27, 31, 29
+    else:
+        knee, ank, toe, heel = 26, 28, 32, 30
+    if not all(_landmark_is_visible(lm, i) for i in (knee, ank)):
+        return None
+    tip = toe if _landmark_is_visible(lm, toe) else heel
+    if not _landmark_is_visible(lm, tip):
+        return None
+    return _angle_from_idx(lm, knee, ank, tip)
+
+
 def validate_S18(lm):
-    ok, msg = _require_core_upper_body(lm)
+    """
+    S18 — Seated ankle mobility.
+
+    One foot must be lifted (ankle higher in frame than the other). Green only if the
+    knee–ankle–foot angle changes enough over a short window — i.e. the ankle is rotating,
+    not held static.
+    """
+    _WINDOW_S = 0.85
+    _MIN_SPAN_DEG = 11.0
+    _MIN_SAMPLES = 6
+
+    ok, msg = _require_s18_landmarks(lm)
     if not ok:
+        _reset_s18_ankle_state()
         return False, msg
-    left_out = abs(lm[15].x - lm[11].x) > 0.22 and abs(lm[15].y - lm[11].y) < 0.18
-    right_out = abs(lm[16].x - lm[12].x) > 0.22 and abs(lm[16].y - lm[12].y) < 0.18
-    return (left_out or right_out), "Hold one arm out at shoulder height and rotate forearm."
+    hip_y = (lm[23].y + lm[24].y) * 0.5
+    knee_y = (lm[25].y + lm[26].y) * 0.5
+    if knee_y < hip_y + 0.025:
+        _reset_s18_ankle_state()
+        return False, "Stay seated with knees bent so both ankles stay in view."
+    _min_lift = 0.017
+    left_lifted = lm[27].y < lm[28].y - _min_lift
+    right_lifted = lm[28].y < lm[27].y - _min_lift
+    if not left_lifted and not right_lifted:
+        _reset_s18_ankle_state()
+        return False, "Lift one heel slightly off the floor so one ankle is clearly higher than the other."
+
+    if left_lifted and right_lifted:
+        lift_left = lm[28].y - lm[27].y
+        lift_right = lm[27].y - lm[28].y
+        active = "left" if lift_left >= lift_right else "right"
+    elif left_lifted:
+        active = "left"
+    else:
+        active = "right"
+
+    if _s18_ankle_state["active_side"] != active:
+        _s18_ankle_state["active_side"] = active
+        _s18_ankle_state["samples"] = []
+
+    ang = _s18_foot_tip_angle_deg(lm, active)
+    if ang is None:
+        return False, "Show the lifted foot’s toes or heel to the camera so rotation can be tracked."
+
+    now = time.monotonic()
+    samples = _s18_ankle_state["samples"]
+    samples.append((now, float(ang)))
+    cutoff = now - _WINDOW_S
+    while samples and samples[0][0] < cutoff:
+        samples.pop(0)
+
+    if len(samples) < _MIN_SAMPLES:
+        return False, "Keep the foot lifted and circle the ankle — hold is not enough."
+
+    angles = [a for _, a in samples]
+    span = max(angles) - min(angles)
+    if span >= _MIN_SPAN_DEG:
+        return True, "Good — keep circling the ankle smoothly."
+    return False, "Circle the ankle in both directions — timer stays paused until it sees rotation."
 
 
 def _require_s19_landmarks(lm) -> tuple[bool, str]:
@@ -722,6 +805,8 @@ _STRETCH_VALIDATORS = {
 def validate_stretch_form(stretch_id: str, lm):
     if stretch_id != "S20":
         _reset_s20_fan_state()
+    if stretch_id != "S18":
+        _reset_s18_ankle_state()
     validator = _STRETCH_VALIDATORS.get(stretch_id)
     if validator is None:
         return False, "No validator available for this stretch."
@@ -788,6 +873,7 @@ def start_routine(stretches: list[dict]):
         raise ValueError("Routine requires at least one stretch.")
     with _routine_lock:
         _reset_s20_fan_state()
+        _reset_s18_ankle_state()
         _routine_state["state"] = "running"
         _routine_state["stretches"] = stretches[:]
         _routine_state["current_index"] = 0
@@ -804,6 +890,7 @@ def stop_routine():
     global _last_routine_tick
     with _routine_lock:
         _reset_s20_fan_state()
+        _reset_s18_ankle_state()
         _routine_state["state"] = "inactive"
         _routine_state["stretches"] = []
         _routine_state["current_index"] = 0
