@@ -26,8 +26,6 @@ Install deps:
 """
 
 # ── Imports ──────────────────────────────────────────────────────────────────
-import os
-import platform
 import threading
 import time
 import numpy as np
@@ -35,6 +33,7 @@ import cv2
 import mediapipe as mp
 
 import threading
+from typing import Optional
 import time
 import numpy as np
 import cv2
@@ -79,7 +78,7 @@ _frame_lock = threading.Lock()
 _frame_event = threading.Event()   # signals that a new frame is ready
 
 # Camera thread lifecycle
-_camera_thread: threading.Thread | None = None
+_camera_thread: Optional[threading.Thread] = None
 _camera_running = False
 
 # Rolling counter: consecutive frames where a wrist is raised above its elbow
@@ -102,7 +101,7 @@ _routine_state = {
     "completed_ids": [],
     "done_message": "",
 }
-_last_routine_tick: float | None = None
+_last_routine_tick: Optional[float] = None
 
 
 def _landmark_is_visible(lm, idx: int, min_visibility: float = 0.35) -> bool:
