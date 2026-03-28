@@ -26,38 +26,11 @@ Install deps:
 """
 
 # ── Imports ──────────────────────────────────────────────────────────────────
-import os
-import platform
 import threading
 import time
 import numpy as np
 import cv2
 import mediapipe as mp
-
-
-def _camera_device_index() -> int:
-    try:
-        return int(os.environ.get("CAMERA_INDEX", "0"))
-    except ValueError:
-        return 0
-
-
-def _video_capture(index: int = 0) -> cv2.VideoCapture:
-    """OpenCV capture with a backend that works reliably on macOS (often fixes all-black frames)."""
-    if platform.system() == "Darwin":
-        # AVFoundation avoids many cases where the default backend opens but returns black frames.
-        cap = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
-        if cap.isOpened():
-            return cap
-        cap.release()
-        return cv2.VideoCapture(index)
-    return cv2.VideoCapture(index)
-
-
-def _warmup_capture(cap: cv2.VideoCapture, n: int = 15) -> None:
-    """Discard initial frames; built-in / Continuity cameras often need a moment before valid pixels."""
-    for _ in range(n):
-        cap.read()
 
 # ── MediaPipe setup ───────────────────────────────────────────────────────────
 _mp_pose = mp.solutions.pose
@@ -124,7 +97,8 @@ def _angle_from_idx(lm, a: int, b: int, c: int) -> float:
 
 
 def _require_core_upper_body(lm) -> tuple[bool, str]:
-    required = [0, 11, 12, 13, 14, 15, 16]
+    required = [0, 11, 12, 13, 14]
+    #required = [0, 11, 12, 13, 14,15,16]
     if any(not _landmark_is_visible(lm, idx) for idx in required):
         return False, "Move fully into frame so head, shoulders and arms are visible."
     return True, ""
@@ -149,7 +123,7 @@ def _wrist_extended_forward(lm, side: str) -> bool:
         return abs(lm[15].x - lm[11].x) > 0.20 and abs(lm[13].x - lm[11].x) > 0.08
     return abs(lm[16].x - lm[12].x) > 0.20 and abs(lm[14].x - lm[12].x) > 0.08
 
-#CHECKED ------
+#checked
 def validate_S01(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
@@ -157,6 +131,7 @@ def validate_S01(lm):
     ear_l_sh, ear_r_sh, _ = _head_tilt_metrics(lm)
     good = min(ear_l_sh, ear_r_sh) < 0.18
     return good, "Tilt one ear closer to your shoulder while keeping shoulders relaxed."
+
 
 def validate_S02(lm):
     ok, msg = _require_core_upper_body(lm)
@@ -166,6 +141,7 @@ def validate_S02(lm):
     chin_tucked = (lm[0].y - eye_mid_y) > 0.06
     return chin_tucked, "Tuck your chin down gently as if making a double chin."
 
+
 def validate_S03(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
@@ -174,6 +150,7 @@ def validate_S03(lm):
     rotated = abs(lm[0].x - shoulder_mid_x) > 0.09
     return rotated, "Rotate your head to one side while keeping shoulders still."
 
+#inv
 def validate_S04(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
@@ -182,7 +159,7 @@ def validate_S04(lm):
     good = min(ear_l_sh, ear_r_sh) < 0.18 and shoulder_delta < 0.30 and ((_angle_from_idx(lm, 14, 12, 11) > 75 and _angle_from_idx(lm, 14, 12, 11) < 105) or (_angle_from_idx(lm, 12, 11, 13) > 75 and _angle_from_idx(lm, 12, 11, 13) < 105))
     return good, "Tilt your head to one side and keep shoulders down."
 
-#NEED TO BE CHECKED ------
+#inv
 def validate_S05(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
@@ -207,7 +184,7 @@ def validate_S07(lm):
         return False, msg
     left_elbow = _angle_from_idx(lm, 11, 13, 15)
     right_elbow = _angle_from_idx(lm, 12, 14, 16)
-    good = 75 < left_elbow < 115 and 75 < right_elbow < 115 and abs(lm[13].y - lm[14].y) < 0.12
+    good = 75 < left_elbow and left_elbow < 115 and 75 < right_elbow and right_elbow < 115 and abs(lm[13].y - lm[14].y) < 0.12
     return good, "Raise both arms to shoulder height with elbows around 90 degrees."
 
 
@@ -217,7 +194,9 @@ def validate_S08(lm):
         return False, msg
     shoulder_width = abs(lm[11].x - lm[12].x)
     elbow_width = abs(lm[13].x - lm[14].x)
-    squeezed = elbow_width > shoulder_width * 0.9
+    left_elbow = _angle_from_idx(lm, 11, 13, 15)
+    right_elbow = _angle_from_idx(lm, 12, 14, 16)
+    squeezed = elbow_width > shoulder_width * 0.9 and 75 < left_elbow and left_elbow < 115 and 75 < right_elbow and right_elbow < 115
     return squeezed, "Pull shoulder blades back and open your chest."
 
 
@@ -225,18 +204,55 @@ def validate_S09(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
-    left_across = lm[15].x > lm[0].x and abs(lm[13].y - lm[11].y) < 0.15
-    right_across = lm[16].x < lm[0].x and abs(lm[14].y - lm[12].y) < 0.15
-    return (left_across or right_across), "Bring one arm straight across your chest at shoulder height."
+    
+    # Left arm crossing (right side of body)
+    #left_height = abs(lm[13].y - lm[11].y) < 0.10  # elbow at shoulder height
+    left_extended = abs(lm[15].x - lm[11].x) > 0.40  # wrist far from shoulder
+    left_across = lm[15].x < lm[0].x  # wrist past centerline
+    left_straight = _angle_from_idx(lm, 11, 13, 15) > 90  # arm fairly straight
+    
+    # Right arm crossing (left side of body)
+    #right_height = abs(lm[14].y - lm[12].y) < 0.10  # elbow at shoulder height
+    right_extended = abs(lm[16].x - lm[12].x) > 0.40  # wrist far from shoulder
+    right_across = lm[16].x > lm[0].x  # wrist past centerline
+    right_straight = _angle_from_idx(lm, 12, 14, 16) > 90  # arm fairly straight
+    
+    left_valid =  left_extended and left_across and left_straight
+    right_valid = right_extended and right_across and right_straight
+    
+    return (left_valid or right_valid), "Bring one arm straight across your chest at shoulder height."
 
-
-def validate_S10(lm):
+#def validate_S10(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
     wrists_back = (lm[15].y > lm[11].y and lm[16].y > lm[12].y and abs(lm[15].x - lm[16].x) < 0.20)
     return wrists_back, "Clasp hands behind your back and lift chest gently."
-
+def validate_S10(lm):
+    ok, msg = _require_core_upper_body(lm)
+    if not ok:
+        return False, msg
+    
+    # Wrists clasped and below shoulders
+    wrists_together = abs(lm[15].x - lm[16].x) < 0.15
+    wrists_low = lm[15].y > lm[11].y and lm[16].y > lm[12].y
+    
+    # Wrists behind torso
+    #center_x = (lm[11].x + lm[12].x) / 2
+    #wrists_back = lm[15].x < center_x and lm[16].x < center_x
+    
+    # Arms relatively straight
+    left_straight = _angle_from_idx(lm, 11, 13, 15) > 135
+    right_straight = _angle_from_idx(lm, 12, 14, 16) > 135
+    
+    # Shoulder blades squeezed
+    shoulder_width = abs(lm[11].x - lm[12].x)
+    #elbow_width = abs(lm[13].x - lm[14].x)
+    wrist_width = abs(lm[15].x - lm[16].x)
+    squeezed = shoulder_width > wrist_width * 1.25
+    
+    valid = wrists_together and wrists_low and left_straight and right_straight and squeezed
+    return valid, "Clasp hands behind your back and lift chest gently."
 
 def validate_S11(lm):
     ok, msg = _require_core_full_body(lm)
@@ -451,10 +467,27 @@ def get_routine_status():
 
 
 # ── Helper: angle at vertex b formed by points a-b-c ─────────────────────────
-def calculate_angle(a, b, c) -> float:
+def calculate_angle(a, b, c, use_2d=True) -> float:
+    """
+    Calculate angle at vertex b formed by points a-b-c.
+    
+    Args:
+        a, b, c: 3D points (x, y, z)
+        use_2d: If True, only uses x,y coordinates (ignores depth). 
+                This matches what's visible on screen. Default True.
+    
+    Returns:
+        Angle in degrees
+    """
     a = np.array(a, dtype=float)
     b = np.array(b, dtype=float)
     c = np.array(c, dtype=float)
+    
+    if use_2d:
+        # Project to 2D (screen space) - ignore z-coordinate
+        a = a[:2]
+        b = b[:2]
+        c = c[:2]
 
     ba = a - b
     bc = c - b
@@ -467,6 +500,146 @@ def calculate_angle(a, b, c) -> float:
 
     cos_angle = np.clip(np.dot(ba, bc) / (norm_ba * norm_bc), -1.0, 1.0)
     return float(np.degrees(np.arccos(cos_angle)))
+
+
+def draw_angle_between_joints(frame: np.ndarray, lm, a: int, b: int, c: int, 
+                              text_color=(255, 255, 255)) -> np.ndarray:
+    """
+    Draw the angle value between three joints on the frame.
+    
+    Args:
+        frame: The video frame to draw on
+        lm: List of landmarks from MediaPipe
+        a, b, c: Joint indices (b is the vertex of the angle)
+        text_color: Color for text (BGR)
+    
+    Returns:
+        Modified frame with angle value displayed
+    
+    Example:
+        # Draw elbow angle (shoulder-elbow-wrist)
+        frame = draw_angle_between_joints(frame, landmarks, 
+                                         a=11, b=13, c=15)  # left side
+    """
+    try:
+        # Get frame dimensions
+        h, w = frame.shape[:2]
+        
+        # Convert normalized coordinates to pixel coordinates
+        point_b = (int(lm[b].x * w), int(lm[b].y * h))
+        
+        # Calculate angle
+        angle = calculate_angle(_safe_point(lm, a), _safe_point(lm, b), _safe_point(lm, c))
+        
+        # Place angle text near the vertex
+        text = f"{angle:.1f}°"
+        text_offset_x = point_b[0] + 10
+        text_offset_y = point_b[1] - 10
+        
+        # Draw text
+        cv2.putText(frame, text, (text_offset_x, text_offset_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2, cv2.LINE_AA)
+        
+        return frame
+    
+    except (IndexError, AttributeError):
+        # If landmarks are not visible, return frame unchanged
+        return frame
+
+
+def draw_distance_between_joints(frame: np.ndarray, lm, a: int, b: int,
+                                 text_color=(255, 255, 255)) -> np.ndarray:
+    """
+    Draw the distance between two joints on the frame.
+    Shows total distance and x,y components (0-1 normalized).
+    
+    Args:
+        frame: The video frame to draw on
+        lm: List of landmarks from MediaPipe
+        a, b: Joint indices
+        text_color: Color for text (BGR)
+    
+    Returns:
+        Modified frame with distance values displayed
+    
+    Example:
+        # Draw distance between wrist and shoulder
+        frame = draw_distance_between_joints(frame, landmarks, a=15, b=11)
+    """
+    try:
+        # Get frame dimensions
+        h, w = frame.shape[:2]
+        
+        # Get normalized coordinates
+        x_a, y_a = lm[a].x, lm[a].y
+        x_b, y_b = lm[b].x, lm[b].y
+        
+        # Calculate distance components (normalized 0-1)
+        dist_x = abs(x_a - x_b)
+        dist_y = abs(y_a - y_b)
+        dist_total = np.sqrt(dist_x**2 + dist_y**2)
+        
+        # Convert midpoint to pixel coordinates for text placement
+        mid_x = int((x_a + x_b) * w / 2)
+        mid_y = int((y_a + y_b) * h / 2)
+        
+        # Format text with components
+        text = f"D:{dist_total:.2f} (x:{dist_x:.2f} y:{dist_y:.2f})"
+        
+        # Draw text
+        cv2.putText(frame, text, (mid_x, mid_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1, cv2.LINE_AA)
+        
+        return frame
+    
+    except (IndexError, AttributeError):
+        # If landmarks are not visible, return frame unchanged
+        return frame
+
+
+def draw_all_key_angles(frame: np.ndarray, lm) -> np.ndarray:
+    """
+    Draw all key joint angles on the frame for debugging.
+    
+    Key angles:
+    - Left Elbow (shoulder-elbow-wrist)
+    - Right Elbow (shoulder-elbow-wrist)
+    - Left Knee (hip-knee-ankle)
+    - Right Knee (hip-knee-ankle)
+    - Spine (shoulder-hip-knee)
+    
+    Args:
+        frame: The video frame to draw on
+        lm: List of landmarks from MediaPipe
+    
+    Returns:
+        Modified frame with all key angles drawn
+    """
+    try:
+        # Left and right elbows
+        frame = draw_angle_between_joints(frame, lm, 11, 13, 15)
+        frame = draw_angle_between_joints(frame, lm, 12, 14, 16)
+        
+        # Left and right knees
+        frame = draw_angle_between_joints(frame, lm, 23, 25, 27)
+        frame = draw_angle_between_joints(frame, lm, 24, 26, 28)
+        
+        # Spine angle
+        shoulder_mid = _midpoint(lm, 11, 12)
+        hip_mid = _midpoint(lm, 23, 24)
+        knee_mid = _midpoint(lm, 25, 26)
+        spine_angle = calculate_angle(shoulder_mid, hip_mid, knee_mid)
+        
+        # Note: spine angle is not drawn via draw_angle_between_joints as it uses computed midpoints
+        h, w = frame.shape[:2]
+        spine_text = f"Spine: {spine_angle:.1f}°"
+        cv2.putText(frame, spine_text, (10, h - 20),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 200, 255), 2, cv2.LINE_AA)
+        
+        return frame
+    
+    except (IndexError, AttributeError):
+        return frame
 
 
 # ── Core detection: analyse a single set of 33 landmarks ─────────────────────
@@ -572,6 +745,19 @@ def _process_frame(frame: np.ndarray, pose) -> np.ndarray:
                 _mp_pose.POSE_CONNECTIONS,
                 landmark_drawing_spec=_mp_drawing_styles.get_default_pose_landmarks_style(),
             )
+        
+        # Draw angles for S09 stretch
+        routine = get_routine_status()
+        current_stretch = routine.get("current_stretch")
+        if current_stretch and current_stretch.get("id") == "S09":
+            frame = draw_angle_between_joints(frame, lm, 11, 13, 15)  # left elbow
+            frame = draw_angle_between_joints(frame, lm, 12, 14, 16)  # right elbow
+            frame = draw_distance_between_joints(frame, lm, 15, 11, text_color=(0, 255, 255))  # left wrist to shoulder distance
+            frame = draw_distance_between_joints(frame, lm, 16, 12, text_color=(0, 255, 255))  # right wrist to shoulder distance
+            # Debug: confirm S09 is running
+            cv2.putText(frame, "S09 Active", (10, 130),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+        
         raw   = _analyse_landmarks(lm)
         label = _smooth_label(raw)
         with _posture_lock:
@@ -606,19 +792,14 @@ def _camera_loop() -> None:
     """
     global _latest_frame, _camera_running
 
-    idx = _camera_device_index()
-    cap = _video_capture(idx)
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         _camera_running = False
         return
     # Keep frames lightweight for lower detection latency on CPU-only setups.
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    if platform.system() != "Darwin":
-        # On macOS, buffer size 1 can worsen black-frame issues with some cameras.
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-
-    _warmup_capture(cap)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     with _mp_pose.Pose(
         min_detection_confidence=0.5,
@@ -658,11 +839,10 @@ def start_camera() -> bool:
         return True  # already running
 
     # Quick probe — don't hold the camera open
-    probe = _video_capture(_camera_device_index())
+    probe = cv2.VideoCapture(0)
     if not probe.isOpened():
         probe.release()
         return False
-    _warmup_capture(probe, n=8)
     probe.release()
 
     _camera_running = True
