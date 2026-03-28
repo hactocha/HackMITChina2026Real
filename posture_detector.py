@@ -103,6 +103,15 @@ _routine_state = {
 }
 _last_routine_tick: Optional[float] = None
 
+# S20: finger fan must repeat (spread → close); not a static pose
+_s20_fan_state = {"saw_spread": False, "last_cycle_t": None, "spread_entered_t": None}
+
+
+def _reset_s20_fan_state() -> None:
+    _s20_fan_state["saw_spread"] = False
+    _s20_fan_state["last_cycle_t"] = None
+    _s20_fan_state["spread_entered_t"] = None
+
 
 def _landmark_is_visible(lm, idx: int, min_visibility: float = 0.35) -> bool:
     try:
@@ -121,6 +130,13 @@ def _midpoint(lm, a: int, b: int):
 
 def _distance(lm, a: int, b: int) -> float:
     return float(np.linalg.norm(_safe_point(lm, a) - _safe_point(lm, b)))
+
+
+def _distance_xy(lm, a: int, b: int) -> float:
+    """Image-plane distance (x, y) — better for finger spread when facing the camera."""
+    pa = np.array([lm[a].x, lm[a].y], dtype=float)
+    pb = np.array([lm[b].x, lm[b].y], dtype=float)
+    return float(np.linalg.norm(pa - pb))
 
 
 def _angle_from_idx(lm, a: int, b: int, c: int) -> float:
@@ -417,13 +433,120 @@ def validate_S16(lm):
     return (left_pose or right_pose), "Extend one arm palm-up and bend wrist downward. Make sure the bent arm is the one further away."
 
 
+def _s17_torso_down_unit_xy(lm) -> Optional[np.ndarray]:
+    """Unit vector from shoulder-mid toward hip-mid in the image plane (torso ‘down’)."""
+    for i in (11, 12, 23, 24):
+        if not _landmark_is_visible(lm, i):
+            return None
+    sx = (lm[11].x + lm[12].x) * 0.5
+    sy = (lm[11].y + lm[12].y) * 0.5
+    hx = (lm[23].x + lm[24].x) * 0.5
+    hy = (lm[23].y + lm[24].y) * 0.5
+    v = np.array([hx - sx, hy - sy], dtype=float)
+    n = float(np.linalg.norm(v))
+    if n < 1e-5:
+        return None
+    return v / n
+
+
+def _s17_arm_perpendicular_to_torso(lm, side: str) -> bool:
+    """
+    Shoulder→wrist vs torso-down in xy: loose “out from torso” cone (~±40° from 90°).
+    |cos θ| ≤ cos(50°) ≈ 0.64 — arms need not form a tight T; more angular gap is OK.
+    """
+    t = _s17_torso_down_unit_xy(lm)
+    if t is None:
+        return False
+    sh, wr = (11, 15) if side == "left" else (12, 16)
+    if not all(_landmark_is_visible(lm, i) for i in (sh, wr)):
+        return False
+    a = np.array([lm[wr].x - lm[sh].x, lm[wr].y - lm[sh].y], dtype=float)
+    n = float(np.linalg.norm(a))
+    if n < 1e-5:
+        return False
+    a = a / n
+    _slack_deg = 40.0
+    _max_abs_dot = float(np.cos(np.radians(90.0 - _slack_deg)))
+    return abs(float(np.dot(a, t))) <= _max_abs_dot + 1e-6
+
+
+def _s17_both_arms_perpendicular_to_torso(lm) -> tuple[bool, str]:
+    if _s17_torso_down_unit_xy(lm) is None:
+        return False, "Step back so hips and shoulders are in frame — needed to check arms vs torso."
+    if not _s17_arm_perpendicular_to_torso(lm, "left"):
+        return False, "Raise your left arm out from your torso (a generous angle is OK)."
+    if not _s17_arm_perpendicular_to_torso(lm, "right"):
+        return False, "Raise your right arm out from your torso (a generous angle is OK)."
+    return True, ""
+
+
+def _s17_index_perpendicular_to_forearm(lm, side: str) -> bool:
+    """S17 arm 1: wrist bent down — loose ∠(elbow, wrist, index) band; index roughly below wrist."""
+    if side == "left":
+        el, wr, tip = 13, 15, 19
+    else:
+        el, wr, tip = 14, 16, 20
+    if not all(_landmark_is_visible(lm, i) for i in (el, wr, tip)):
+        return False
+    ang = _angle_from_idx(lm, el, wr, tip)
+    if not (40.0 <= ang <= 138.0):
+        return False
+    return True
+
+
+def _s17_elbow_angle(lm, side: str) -> Optional[float]:
+    """Interior angle at elbow: ∠(shoulder, elbow, wrist). None if landmarks missing."""
+    if side == "left":
+        a, b, c = 11, 13, 15
+    else:
+        a, b, c = 12, 14, 16
+    if not all(_landmark_is_visible(lm, i) for i in (a, b, c)):
+        return None
+    return _angle_from_idx(lm, a, b, c)
+
+
+def _s17_arm1_ok(lm, side: str) -> bool:
+    """Arm 1: elbow fairly straight + wrist bent (thresholds relaxed ~25–30% vs original 160° / tight wrist)."""
+    ea = _s17_elbow_angle(lm, side)
+    if ea is None or ea <= 152.0:
+        return False
+    return _s17_index_perpendicular_to_forearm(lm, side)
+
+
+def _s17_arm2_elbow_ok(lm, side: str) -> bool:
+    """Arm 2: elbow not too sharp — relaxed from 130°."""
+    ea = _s17_elbow_angle(lm, side)
+    return ea is not None and ea > 118.0
+
+
 def validate_S17(lm):
     ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
-    left_pose = _wrist_extended_forward(lm, "left") and _angle_from_idx(lm, 13, 15, 19) > 160
-    right_pose = _wrist_extended_forward(lm, "right") and _angle_from_idx(lm, 14, 16, 20) > 160
-    return (left_pose or right_pose), "Extend one arm palm-down and press the hand downward."
+    ok, msg = _s17_both_arms_perpendicular_to_torso(lm)
+    if not ok:
+        return False, msg
+
+    # Symmetric: left can be arm1 and right arm2, or the opposite. Which is which does not matter.
+    arm1_left = _s17_arm1_ok(lm, "left")
+    arm1_right = _s17_arm1_ok(lm, "right")
+
+    if arm1_left and arm1_right:
+        return False, "Only one arm should be the ‘stretch’ side (fairly straight elbow + bent wrist)."
+
+    if arm1_left and _s17_arm2_elbow_ok(lm, "right"):
+        return True, "Good — arm 1 straight with bent wrist; arm 2 relaxed (hands need not touch)."
+
+    if arm1_right and _s17_arm2_elbow_ok(lm, "left"):
+        return True, "Good — arm 1 straight with bent wrist; arm 2 relaxed (hands need not touch)."
+
+    if arm1_left or arm1_right:
+        return False, "The other arm only needs a reasonably open elbow (~>118°); wrist/hand ignored."
+
+    return (
+        False,
+        "One arm: elbow past ~152° with wrist bent. Other: elbow past ~118°. Arms out from torso (hands need not touch).",
+    )
 
 
 def validate_S18(lm):
@@ -435,22 +558,149 @@ def validate_S18(lm):
     return (left_out or right_out), "Hold one arm out at shoulder height and rotate forearm."
 
 
+def _require_s19_landmarks(lm) -> tuple[bool, str]:
+    """Shoulders, elbows, wrists, hips — for torso band + prayer line + palm check."""
+    for idx in (11, 12, 13, 14, 15, 16, 23, 24):
+        if not _landmark_is_visible(lm, idx):
+            return False, "Step back so shoulders, elbows, hips, and both hands are in frame."
+    return True, ""
+
+
 def validate_S19(lm):
-    ok, msg = _require_core_upper_body(lm)
+    ok, msg = _require_s19_landmarks(lm)
     if not ok:
         return False, msg
-    wrists_together = _distance(lm, 15, 16) < 0.10
-    hands_center = abs(((lm[15].x + lm[16].x) / 2.0) - lm[0].x) < 0.12
-    return wrists_together and hands_center, "Press palms together in front of your chest."
+
+    shoulder_my = (lm[11].y + lm[12].y) / 2.0
+    hip_my = (lm[23].y + lm[24].y) / 2.0
+    shoulder_mx = (lm[11].x + lm[12].x) / 2.0
+    hip_mx = (lm[23].x + lm[24].x) / 2.0
+    torso_mx = (shoulder_mx + hip_mx) / 2.0
+
+    # Prefer index tips (19/20) as "finger points"; fall back to wrists if occluded.
+    if _landmark_is_visible(lm, 19) and _landmark_is_visible(lm, 20):
+        point_my = (lm[19].y + lm[20].y) / 2.0
+        point_mx = (lm[19].x + lm[20].x) / 2.0
+    else:
+        point_my = (lm[15].y + lm[16].y) / 2.0
+        point_mx = (lm[15].x + lm[16].x) / 2.0
+
+    top_y = min(shoulder_my, hip_my)
+    bot_y = max(shoulder_my, hip_my)
+    torso_h = bot_y - top_y
+    if torso_h < 0.04:
+        return False, "Stand so shoulders and hips are clearly separated in frame."
+
+    # Torso split into 4 equal vertical slices (shoulder→hip); green = middle 2 (Q2+Q3).
+    _S19_Q = 0.25 * torso_h
+    band_top = top_y + _S19_Q
+    band_bot = top_y + 3.0 * _S19_Q
+    in_vertical_band = band_top <= point_my <= band_bot
+
+    # Palms together: wrists close; index tips too when visible (stricter “touching”).
+    _S19_WRIST_XY = 0.11
+    _S19_INDEX_XY = 0.10
+    wrists_close = _distance_xy(lm, 15, 16) < _S19_WRIST_XY
+    index_close = True
+    if _landmark_is_visible(lm, 19) and _landmark_is_visible(lm, 20):
+        index_close = _distance_xy(lm, 19, 20) < _S19_INDEX_XY
+    palms_touching = wrists_close and index_close
+
+    # Elbow–wrist–wrist–elbow ~ straight (angles at each wrist toward ~180°).
+    _S19_MIN_STRAIGHT_DEG = 148.0
+    ang_l = _angle_from_idx(lm, 13, 15, 16)
+    ang_r = _angle_from_idx(lm, 15, 16, 14)
+    arms_straightish = ang_l >= _S19_MIN_STRAIGHT_DEG and ang_r >= _S19_MIN_STRAIGHT_DEG
+
+    centered = abs(point_mx - torso_mx) < 0.20
+
+    if not palms_touching:
+        return False, "Press your palms flat together — wrists and fingers touching."
+    if not arms_straightish:
+        return False, "Straighten gently so elbows, hands, and wrists form one line in front of you."
+    if not centered:
+        return False, "Keep hands in front of your torso."
+    if not in_vertical_band:
+        if point_my < band_top:
+            return False, "Lower your hands — keep them in the middle of your torso (not up at your chest)."
+        return False, "Raise your hands — stay in the middle band of your torso (above your hips)."
+
+    return True, "Good — palms together, arms in a line, middle torso."
+
+
+def _require_s20_finger_landmarks(lm) -> tuple[bool, str]:
+    for idx in (15, 16, 17, 18, 19, 20):
+        if not _landmark_is_visible(lm, idx):
+            return False, "Face the camera with both hands visible so finger spread can be tracked."
+    return True, ""
 
 
 def validate_S20(lm):
+    """
+    Finger fan: index–pinky span opens then closes. Green only while in an early-open /
+    full-open stroke window or briefly after a completed close (no frame-delta motion cue —
+    that was too sensitive to camera jitter).
+    """
+    # OPEN_ARM: start "active stroke" earlier so green does not drop between reps / mid-open.
+    # OPEN: still required for a rep to count toward saw_spread → close cycle.
+    _S20_OPEN_ARM = 0.046
+    _S20_OPEN = 0.051
+    _S20_CLOSED = 0.043
+    _S20_RECENT_CYCLE_S = 0.48
+    _S20_ACTIVE_OPEN_S = 0.72
+
     ok, msg = _require_core_upper_body(lm)
     if not ok:
         return False, msg
+    ok, msg = _require_s20_finger_landmarks(lm)
+    if not ok:
+        return False, msg
+
     hands_up = lm[15].y < lm[11].y + 0.25 and lm[16].y < lm[12].y + 0.25
     arms_open = abs(lm[15].x - lm[16].x) > 0.25
-    return hands_up and arms_open, "Hold hands up and spread fingers wide like a fan."
+    if not (hands_up and arms_open):
+        return False, "Hold hands up in front of you with arms apart so the camera sees your fingers."
+
+    # MediaPipe: L pinky/index 17,19 — R pinky/index 18,20
+    span = max(_distance_xy(lm, 17, 19), _distance_xy(lm, 18, 20))
+    spread_open = span >= _S20_OPEN
+    spread_closed = span <= _S20_CLOSED
+    opening_stroke = span >= _S20_OPEN_ARM
+    now = time.monotonic()
+
+    # Close→open cycle first (same frame as hitting "closed" while arms were spread)
+    if _s20_fan_state["saw_spread"] and spread_closed:
+        _s20_fan_state["last_cycle_t"] = now
+        _s20_fan_state["saw_spread"] = False
+        _s20_fan_state["spread_entered_t"] = None
+
+    if spread_open:
+        _s20_fan_state["saw_spread"] = True
+
+    if opening_stroke:
+        if _s20_fan_state["spread_entered_t"] is None:
+            _s20_fan_state["spread_entered_t"] = now
+    else:
+        # Back to nearly closed without having been in a wide spread — reset early-open arm
+        if span <= _S20_CLOSED + 0.0015 and not _s20_fan_state["saw_spread"]:
+            _s20_fan_state["spread_entered_t"] = None
+
+    last = _s20_fan_state["last_cycle_t"]
+    entered = _s20_fan_state["spread_entered_t"]
+    recent_cycle = last is not None and (now - last) < _S20_RECENT_CYCLE_S
+    # Credit "opening" immediately; span > closed avoids flicker while moving toward a close
+    in_fresh_spread = (
+        entered is not None
+        and (now - entered) < _S20_ACTIVE_OPEN_S
+        and span > _S20_CLOSED
+    )
+    is_correct = recent_cycle or in_fresh_spread
+
+    if is_correct:
+        return True, "Good — keep fanning open, then close."
+    if last is None and entered is None:
+        return False, "Spread your fingers wide, then close them together. Repeat."
+    return False, "Keep moving: fan out, then close. Timer pauses when you stop."
 
 
 _STRETCH_VALIDATORS = {
@@ -462,6 +712,8 @@ _STRETCH_VALIDATORS = {
 
 
 def validate_stretch_form(stretch_id: str, lm):
+    if stretch_id != "S20":
+        _reset_s20_fan_state()
     validator = _STRETCH_VALIDATORS.get(stretch_id)
     if validator is None:
         return False, "No validator available for this stretch."
@@ -527,6 +779,7 @@ def start_routine(stretches: list[dict]):
     if not stretches:
         raise ValueError("Routine requires at least one stretch.")
     with _routine_lock:
+        _reset_s20_fan_state()
         _routine_state["state"] = "running"
         _routine_state["stretches"] = stretches[:]
         _routine_state["current_index"] = 0
@@ -542,6 +795,7 @@ def start_routine(stretches: list[dict]):
 def stop_routine():
     global _last_routine_tick
     with _routine_lock:
+        _reset_s20_fan_state()
         _routine_state["state"] = "inactive"
         _routine_state["stretches"] = []
         _routine_state["current_index"] = 0
