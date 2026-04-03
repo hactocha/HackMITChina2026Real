@@ -14,6 +14,7 @@ StretchAI is a webcam-assisted posture and stretch coach built with Flask, Media
   - Auto-advances through all five stretches.
   - Shows completion message at the end.
   - Stop button to exit the routine at any time.
+- Selection of your own routine from the existing library of stretches
 
 ## Setup
 
